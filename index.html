@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 會議助手</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/markmap-lib@0.15.4/dist/browser/index.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.min.js"></script>
+
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* 導航列 */
+        .navbar {
+            background-color: #343a40; padding: 10px 20px; display: flex; gap: 10px; align-items: center; color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); flex-shrink: 0;
+        }
+        .navbar h2 { margin: 0 20px 0 0; font-size: 1.2em; color: #fff; }
+        .nav-btn {
+            background: transparent; border: 1px solid #6c757d; color: #ddd; padding: 8px 15px; border-radius: 20px; cursor: pointer; transition: 0.3s;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .nav-btn.active { background: #007bff; border-color: #007bff; color: white; font-weight: bold; }
+
+        .container { flex: 1; padding: 20px; overflow: hidden; position: relative; }
+        .page-section { display: none; height: 100%; gap: 20px; animation: fadeIn 0.3s; }
+        .page-section.active { display: flex; }
+
+        /* 版面配置 */
+        #page-home .main-col { flex: 2; display: flex; flex-direction: column; overflow: hidden; }
+        #page-home .side-col { flex: 1; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+        
+        #page-summary { flex-direction: column; max-width: 900px; margin: 0 auto; overflow-y: auto; }
+        #page-mindmap { flex-direction: column; height: 100%; }
+
+        .card { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        .card.control-panel { flex: 0 0 auto; margin-bottom: 15px; }
+        .card.transcript-panel { flex: 1; overflow: hidden; }
+
+        h3 { margin-top: 0; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 10px; flex-shrink: 0;}
+
+        button { cursor: pointer; padding: 8px 12px; border-radius: 4px; border: none; font-weight: bold; transition: 0.2s; }
+        .btn-primary { background-color: #007bff; color: white; width: 100%; }
+        .btn-danger { background-color: #dc3545; color: white; width: 100%; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-info { background-color: #17a2b8; color: white; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+
+        /* 轉錄文字框樣式 */
+        .transcript-box { 
+            border: 1px solid #ccc; padding: 10px; background: #fff; 
+            overflow-y: auto; flex: 1; border-radius: 4px; margin-bottom: 10px; 
+        }
+        #live-transcript { border-left: 5px solid #007bff; flex: 1; }
+        #full-transcript { border-left: 5px solid #28a745; flex: 1; background: #f9fff9; line-height: 1.8; color: #333; }
+        #full-transcript p { margin: 8px 0; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; color: white; margin-right: 5px; }
+        .tag-consensus { background-color: #28a745; }
+        .tag-dispute { background-color: #dc3545; }
+        .text-dispute { color: #c0392b; }
+
+        #mindmap-container { flex: 1; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
+        #markmap-svg { width: 100%; height: 100%; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        
+        #next-meeting-area input, #next-meeting-area textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .input-group { display: flex; gap: 5px; }
+        #new-topic-input { flex: 1; padding: 8px; }
+        .topic-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .topic-item.done { text-decoration: line-through; color: #aaa; }
+    </style>
+
+    <script>
+        const userJson = localStorage.getItem("whisper_user");
+        if (!userJson) {
+            window.location.replace("login.html");
+        } else {
+            window.currentUser = JSON.parse(userJson);
+        }
+
+        function logout() {
+            localStorage.removeItem("whisper_user");
+            window.location.replace("login.html");
+        }
+    </script>
+</head>
+<body>
+
+    <div class="navbar">
+        <h2>🎙️ Whisper 會議助手</h2>
+        <button class="nav-btn active" onclick="switchPage('home')">1. 會議進行</button>
+        <button class="nav-btn" onclick="switchPage('summary')">2. AI 總結報告</button>
+        <button class="nav-btn" onclick="switchPage('mindmap')">3. 會議心智圖</button>
+        
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
+            <button id="welcome-msg" onclick="window.location.href='dashboard.html'" style="background: transparent; border: none; color: #80bdff; font-weight: bold; cursor: pointer; font-size: 0.9em; text-decoration: underline; padding: 0;"></button>
+            
+            <span id="statusText" style="font-size: 0.9em; color: #ffc107;">狀態：尚未連線</span>
+            <button onclick="logout()" style="background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#dc3545'; this.style.color='#fff';" onmouseout="this.style.background='transparent'; this.style.color='#dc3545';">登出</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="page-home" class="page-section active">
+            <div class="main-col">
+                <div class="card control-panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <label><input type="radio" name="mode" value="mic" checked onchange="toggleMode()"> 🎙️ 麥克風</label>
+                            <label style="margin-left:15px;"><input type="radio" name="mode" value="file" onchange="toggleMode()"> 📂 匯入檔案</label>
+                        </div>
+                        <select id="template-select" style="padding: 5px;">
+                            <option value="general">📋 標準會議</option>
+                            <option value="brainstorming">💡 腦力激盪</option>
+                            <option value="interview">👤 人才面試</option>
+                            <option value="weekly">📅 團隊週報</option>
+                        </select>
+                    </div>
+
+                    <div id="file-upload-area" style="display:none; margin-bottom:10px;">
+                        <input type="file" id="audio-file-input" accept="audio/*,video/*">
+                    </div>
+
+                    <div id="image-upload-section" style="margin-bottom: 10px; display: flex; gap: 10px; align-items: center; background: #e3f2fd; padding: 10px; border-radius: 6px;">
+                        <input type="file" id="image-input" accept="image/*" style="display:none;">
+                        <button onclick="document.getElementById('image-input').click()" class="btn-info" style="width:auto;">🖼️ 選擇圖片</button>
+                        <span id="img-status" style="font-size: 0.8em; color: #666;">未選擇</span>
+                        <button id="btn-upload-image" class="btn-info" style="width:auto; display:none; margin-left: auto;">開始分析</button>
+                    </div>
+
+                    <button id="actionButton" class="btn-primary" disabled>連線中...</button>
+                    <div id="warning-msg" style="color:red; display:none; margin-top:5px;"></div>
+                </div>
+
+                <div class="card transcript-panel">
+                    <h3>即時字幕 (含情緒標記)</h3>
+                    <div id="live-transcript" class="transcript-box"></div>
+                    <h3>完整逐字稿 (純文字紀錄)</h3>
+                    <div id="full-transcript" class="transcript-box"></div>
+                </div>
+            </div>
+
+            <div class="side-col">
+                <div class="card">
+                    <h3>📊 智慧議程監控</h3>
+                    <div class="input-group" id="input-area">
+                        <input type="text" id="new-topic-input" placeholder="輸入議程...">
+                        <button id="add-topic-btn" class="btn-success">+</button>
+                    </div>
+                    <div id="agenda-list" style="margin-top: 10px;">
+                        <p style="text-align:center; color:#ccc;">無議程</p>
+                    </div>
+                </div>
+
+                <div class="card" id="interim-summary-area">
+                    <h3>⏱️ 每分鐘即時重點</h3>
+                    <div id="interim-summary-box" style="font-size:0.9em; color:#333; max-height: 250px; overflow-y: auto; white-space: pre-wrap; background: #f9f9f9; padding: 10px; border-radius: 4px;">
+                        會議開始後，將每分鐘自動更新...
+                    </div>
+                </div>
+
+                <div class="card" id="next-meeting-area">
+                    <h3>📅 預約跟進會議</h3>
+                    <p style="font-size:0.8em; color:#666;">(AI 總結後自動填入建議)</p>
+                    <label>下一次議程：</label>
+                    <textarea id="next-agenda-preview" rows="3" placeholder="待辦事項..."></textarea>
+                    <label>開會時間：</label>
+                    <input type="datetime-local" id="next-meeting-time">
+                    <label>Email (逗號分隔)：</label>
+                    <input type="text" id="next-emails" placeholder="user@example.com">
+                    <button id="btn-schedule-next" class="btn-info" style="width:100%;">發送 Calendar 邀請</button>
+                    <p id="cal-status" style="font-size:0.9em; margin-top:5px;"></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-summary" class="page-section">
+            <div class="card" style="height: 100%; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>🤖 AI 會議總結報告</h3>
+                    <div>
+                        <button id="downloadBtn" class="btn-info" disabled>📥 下載 .md</button>
+                        <button id="copyBtn" class="btn-info" disabled>📋 複製</button>
+                    </div>
+                </div>
+                <div id="ai-summary-box" style="flex: 1; background: #f8f9fa; padding: 20px; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6;">
+                    <div style="text-align: center; color: #888; margin-top: 50px;">
+                        <p>會議尚未結束或未生成報告</p>
+                        <p>請在「第一頁」點擊停止會議來生成報告</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-mindmap" class="page-section">
+            <div class="card" style="height: 100%; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3>🧠 結構化心智圖</h3>
+                    <audio id="mindmap-audio-player" controls style="height: 35px;"></audio>
+                </div>
+                <div id="mindmap-container">
+                    <svg id="markmap-svg"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        if(window.currentUser) {
+            document.getElementById('welcome-msg').innerText = "👤 歡迎, " + window.currentUser.username + " (點此返回列表)";
+        }
+    </script>
+
+    <script src="audio_manager.js"></script>
+    <script src="ui_manager.js"></script>
+    <script src="record.js?v=2024"></script>
+</body>
+</html>

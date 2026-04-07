@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>檢視會議紀錄</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/markmap-lib@0.15.4/dist/browser/index.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.min.js"></script>
+
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        .header { background: #343a40; color: white; padding: 15px 30px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .btn-back { background: transparent; border: 1px solid #fff; color: #fff; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: 0.2s; text-decoration: none; font-size: 14px; }
+        .btn-back:hover { background: #fff; color: #343a40; }
+        .container { display: flex; gap: 15px; flex: 1; min-height: 0; }
+        .col-3 { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+        h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; color: #333; font-size: 16px; flex-shrink: 0; }
+        #transcript-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.8; color: #444; background: #f9fff9; padding: 15px; border-left: 5px solid #28a745; border-radius: 4px; font-size: 14px; }
+        #summary-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #444; font-size: 14px; }
+        #mindmap-container { flex: 1; border: 1px solid #ddd; border-radius: 8px; background: #fff; overflow: hidden; }
+        #markmap-svg { width: 100%; height: 100%; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h2 id="meeting-title" style="margin: 0; font-size: 20px;">載入中...</h2>
+        <a href="dashboard.html" class="btn-back">🔙 返回專案列表</a>
+    </div>
+
+    <div class="container">
+        <div class="col-3">
+            <div class="card">
+                <h3>📝 完整逐字稿</h3>
+                <div id="transcript-content">逐字稿載入中...</div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card">
+                <h3>🤖 AI 會議總結報告</h3>
+                <div id="summary-content">總結載入中...</div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card">
+                <h3 style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+                    <span>🧠 結構化心智圖 (點擊自動播片段)</span>
+                    <div id="audio-container"></div>
+                </h3>
+                <div id="mindmap-container">
+                    <svg id="markmap-svg"></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://127.0.0.1:8000";
+        const urlParams = new URLSearchParams(window.location.search);
+        const meetingId = urlParams.get('meeting_id');
+
+        let mindmapTimestamps = [];
+        let targetEndTime = null;
+
+        if (!meetingId) {
+            alert("無效的會議 ID");
+            window.location.href = "dashboard.html";
+        }
+
+        async function loadMeetingData() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}`);
+                if (!response.ok) throw new Error("找不到會議資料");
+                const data = await response.json();
+
+                document.getElementById('meeting-title').innerText = `📄 ${data.title} (歷史紀錄)`;
+                document.getElementById('transcript-content').innerText = data.transcript_text || "無逐字稿資料";
+                document.getElementById('summary-content').innerText = data.summary_text || "無總結資料";
+
+                if (data.audio_file_path) {
+                    document.getElementById('audio-container').innerHTML = `
+                        <audio id="meeting-audio-player" controls style="height: 35px; outline: none; max-width: 100%;">
+                            <source src="${API_BASE_URL}/${data.audio_file_path}" type="audio/webm">
+                            您的瀏覽器不支援音訊播放。
+                        </audio>
+                    `;
+                    
+                    const player = document.getElementById('meeting-audio-player');
+                    player.addEventListener('timeupdate', () => {
+                        if (targetEndTime !== null && player.currentTime >= targetEndTime) {
+                            player.pause(); 
+                            console.log("⏸️ 已播放完畢此片段，自動暫停");
+                            targetEndTime = null; 
+                        }
+                    });
+                }
+
+                if (data.mindmap_data) {
+                    const { Markmap, Transformer } = window.markmap;
+                    const transformer = new Transformer();
+                    const { root } = transformer.transform(data.mindmap_data);
+                    
+                    mindmapTimestamps = [];
+                    function extractTimes(node) {
+                        if(!node) return;
+                        if(node.content) {
+                            const m = node.content.match(/\[(\d+):(\d+)\]/);
+                            if(m) {
+                                const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                                if(!mindmapTimestamps.includes(sec)) mindmapTimestamps.push(sec);
+                            }
+                        }
+                        if(node.children) node.children.forEach(extractTimes);
+                    }
+                    extractTimes(root);
+                    mindmapTimestamps.sort((a, b) => a - b);
+
+                    const svgEl = document.getElementById('markmap-svg');
+                    svgEl.innerHTML = '';
+                    window.mm = Markmap.create(svgEl, null, root);
+                } else {
+                    document.getElementById('mindmap-container').innerHTML = "<p style='padding:20px; color:#888; text-align:center;'>無心智圖資料</p>";
+                }
+            } catch (error) {
+                console.error(error);
+                document.getElementById('transcript-content').innerText = "讀取失敗：" + error.message;
+                document.getElementById('summary-content').innerText = "讀取失敗：" + error.message;
+            }
+        }
+
+        function setupMindmapClickJump() {
+            const mindmapSvg = document.getElementById('markmap-svg');
+            if (mindmapSvg) {
+                mindmapSvg.addEventListener('click', (e) => {
+                    const nodeGroup = e.target.closest('.markmap-node');
+                    if (nodeGroup && window.d3) {
+                        const datum = window.d3.select(nodeGroup).datum();
+                        if (datum && datum.data && datum.data.content) {
+                            const contentText = datum.data.content;
+                            const timeMatch = contentText.match(/\[(\d+):(\d+)\]/);
+                            if (timeMatch) {
+                                const minutes = parseInt(timeMatch[1], 10);
+                                const seconds = parseInt(timeMatch[2], 10);
+                                const totalSeconds = (minutes * 60) + seconds;
+                                
+                                const player = document.getElementById('meeting-audio-player');
+                                if (player) {
+                                    const currentIndex = mindmapTimestamps.indexOf(totalSeconds);
+                                    if (currentIndex !== -1 && currentIndex < mindmapTimestamps.length - 1) {
+                                        targetEndTime = mindmapTimestamps[currentIndex + 1];
+                                    } else {
+                                        targetEndTime = null; 
+                                    }
+
+                                    // 🚀 [核心優化] 往前退 2 秒播放，讓語氣跟上下文不會被生硬切斷
+                                    let jumpTime = totalSeconds - 2; 
+                                    if (jumpTime < 0) jumpTime = 0;
+
+                                    player.currentTime = jumpTime;
+                                    player.play();
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.onload = async function() {
+            await loadMeetingData(); 
+            setupMindmapClickJump(); 
+        };
+    </script>
+</body>
+</html>

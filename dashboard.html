@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>會員專區 - 專案資料夾</title>
+    <style>
+        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; color: white; padding: 15px 30px; border-radius: 8px; margin-bottom: 20px; }
+        .btn-logout { background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-logout:hover { background: #dc3545; color: white; }
+        .container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; height: 75vh;}
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
+        
+        /* 左側資料夾區 */
+        .folder-panel { flex: 1; }
+        .folder-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        .folder-item { padding: 12px; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 10px; cursor: pointer; transition: 0.2s; font-weight: bold; color: #333; background: #fdfdfd;}
+        .folder-item:hover { background: #e9ecef; border-color: #b8daff; }
+        .folder-item.active { background: #007bff; color: white; border-color: #007bff; }
+        
+        /* 右側會議區 */
+        .meeting-panel { flex: 2; background: #fafafa; border: 2px dashed #ccc; align-items: center; justify-content: center;}
+        .meeting-panel.active { background: white; border: none; align-items: stretch; justify-content: flex-start;}
+        .meeting-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; }
+        .meeting-item { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .meeting-title { font-size: 1.1em; font-weight: bold; color: #333; }
+        .meeting-date { font-size: 0.8em; color: #888; }
+        
+        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+        button:hover { background: #218838; }
+        .btn-enter { background: #007bff; width: auto; padding: 6px 12px; }
+        .btn-view { background: #17a2b8; width: auto; padding: 6px 12px; }
+
+        /* ==========================================
+           🚀 [新增] 三個點下拉選單的專屬 CSS 樣式
+           ========================================== */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-btn { background: transparent; border: none; font-size: 1.5em; cursor: pointer; padding: 0 5px; color: #666; transition: 0.2s; width: auto; }
+        .dropdown-btn:hover { color: #000; background: transparent; }
+        /* 下拉選單本體 (預設隱藏) */
+        .dropdown-menu { 
+            display: none; position: absolute; right: 0; top: 100%; background-color: #fff; 
+            min-width: 100px; box-shadow: 0px 4px 10px rgba(0,0,0,0.15); border-radius: 6px; z-index: 10; border: 1px solid #eee; overflow: hidden;
+        }
+        /* 顯示選單用的 class */
+        .dropdown-menu.show { display: block; }
+        /* 選單內的按鈕 */
+        .dropdown-item { padding: 10px 15px; color: #dc3545; display: block; cursor: pointer; text-align: center; font-weight: bold; font-size: 0.9em; transition: 0.2s; }
+        .dropdown-item:hover { background-color: #f8d7da; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2 style="margin: 0;">📁 會員專區</h2>
+    <div style="display: flex; align-items: center; gap: 20px;">
+        <span id="welcome-text"></span>
+        <button class="btn-logout" onclick="logout()" style="width: auto;">登出</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card folder-panel">
+        <h3>📂 我的資料夾</h3>
+        <input type="text" id="new-folder-name" placeholder="新增主題 (例: 畢業專題)">
+        <button onclick="createFolder()" style="margin-bottom: 15px;">➕ 建立資料夾</button>
+        <ul class="folder-list" id="folder-list"></ul>
+    </div>
+
+    <div class="card meeting-panel" id="meeting-panel-empty">
+        <h3 style="color: #999;">👈 請先從左側選擇或建立一個資料夾</h3>
+    </div>
+
+    <div class="card meeting-panel active" id="meeting-panel-content" style="display: none;">
+        <h3 id="current-folder-title" style="border-bottom: 2px solid #007bff; padding-bottom: 10px;">資料夾名稱</h3>
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <input type="text" id="new-meeting-title" placeholder="這場會議叫什麼？ (例: 第一次討論)">
+            <button onclick="createMeeting()" style="width: 200px;">🎙️ 開始新會議</button>
+        </div>
+        <ul class="meeting-list" id="meeting-list"></ul>
+    </div>
+</div>
+
+<script>
+    const API_BASE_URL = "http://127.0.0.1:8000";
+    const userJson = localStorage.getItem("whisper_user");
+    if (!userJson) window.location.replace("login.html");
+    const currentUser = JSON.parse(userJson);
+    document.getElementById('welcome-text').innerText = `👤 ${currentUser.username}，您好！`;
+
+    let currentSelectedFolderId = null;
+
+    // ==========================================
+    // 🚀 [新增] 點擊其他地方自動關閉下拉選單
+    // ==========================================
+    window.onclick = function(event) {
+        if (!event.target.matches('.dropdown-btn')) {
+            const dropdowns = document.getElementsByClassName("dropdown-menu");
+            for (let i = 0; i < dropdowns.length; i++) {
+                if (dropdowns[i].classList.contains('show')) {
+                    dropdowns[i].classList.remove('show');
+                }
+            }
+        }
+    }
+
+    // 🚀 [新增] 控制下拉選單顯示/隱藏的函式
+    function toggleDropdown(menuId, event) {
+        event.stopPropagation(); // 阻止事件冒泡
+        
+        // 先把所有其他已開啟的選單關掉
+        const dropdowns = document.getElementsByClassName("dropdown-menu");
+        for (let i = 0; i < dropdowns.length; i++) {
+            if (dropdowns[i].id !== menuId) {
+                dropdowns[i].classList.remove('show');
+            }
+        }
+        // 切換點擊的選單
+        document.getElementById(menuId).classList.toggle("show");
+    }
+
+    function logout() {
+        localStorage.removeItem("whisper_user");
+        window.location.replace("login.html");
+    }
+
+    async function loadFolders() {
+        const res = await fetch(`${API_BASE_URL}/folders/${currentUser.id}`);
+        const data = await res.json();
+        const listEl = document.getElementById('folder-list');
+        listEl.innerHTML = '';
+        data.folders.forEach(f => {
+            const li = document.createElement('li');
+            li.className = 'folder-item';
+            li.id = `folder-tab-${f.id}`;
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.style.alignItems = "center";
+            li.onclick = () => selectFolder(f.id, f.name);
+            
+            // 🚀 [修改點] 資料夾改為「三個點」下拉選單
+            li.innerHTML = `
+                <span>📁 ${f.name}</span>
+                <div class="dropdown">
+                    <button class="dropdown-btn" onclick="toggleDropdown('folder-menu-${f.id}', event)">⋮</button>
+                    <div id="folder-menu-${f.id}" class="dropdown-menu">
+                        <div class="dropdown-item" onclick="deleteFolder(${f.id}, event)">🗑️ 刪除</div>
+                    </div>
+                </div>
+            `;
+            listEl.appendChild(li);
+        });
+    }
+
+    async function createFolder() {
+        const name = document.getElementById('new-folder-name').value;
+        if(!name) return;
+        await fetch(`${API_BASE_URL}/folders`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: currentUser.id, name: name })
+        });
+        document.getElementById('new-folder-name').value = '';
+        loadFolders();
+    }
+
+    async function selectFolder(folderId, folderName) {
+        currentSelectedFolderId = folderId;
+        
+        document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+        document.getElementById(`folder-tab-${folderId}`).classList.add('active');
+        document.getElementById('meeting-panel-empty').style.display = 'none';
+        document.getElementById('meeting-panel-content').style.display = 'flex';
+        document.getElementById('current-folder-title').innerText = `📂 ${folderName}`;
+
+        const res = await fetch(`${API_BASE_URL}/meetings/by_folder/${folderId}`);
+        const data = await res.json();
+        const listEl = document.getElementById('meeting-list');
+        listEl.innerHTML = '';
+
+        if(data.meetings.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center; color:#ccc;">此資料夾目前空空如也！</p>';
+            return;
+        }
+
+        data.meetings.forEach(m => {
+            const li = document.createElement('li');
+            li.className = 'meeting-item';
+            
+            let btnHtml = m.summary_text 
+                ? `<button class="btn-view" onclick="window.location.href='view.html?meeting_id=${m.id}'">📄 檢視紀錄</button>`
+                : `<button class="btn-enter" onclick="goToMeeting(${m.id}, '${m.title}')">▶️ 繼續會議</button>`;
+            
+            // 🚀 [修改點] 會議紀錄改為「三個點」下拉選單
+            li.innerHTML = `
+                <div>
+                    <div class="meeting-title">${m.title}</div>
+                    <div class="meeting-date">${new Date(m.created_at).toLocaleString()}</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${btnHtml}
+                    <div class="dropdown">
+                        <button class="dropdown-btn" onclick="toggleDropdown('meeting-menu-${m.id}', event)">⋮</button>
+                        <div id="meeting-menu-${m.id}" class="dropdown-menu">
+                            <div class="dropdown-item" onclick="deleteMeeting(${m.id}, event)">🗑️ 刪除</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            listEl.appendChild(li);
+        });
+    }
+
+    async function createMeeting() {
+        const title = document.getElementById('new-meeting-title').value;
+        if(!title || !currentSelectedFolderId) return;
+        
+        const res = await fetch(`${API_BASE_URL}/meetings`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_id: currentSelectedFolderId, title: title })
+        });
+        const data = await res.json();
+        goToMeeting(data.meeting_id, title);
+    }
+
+    function goToMeeting(meetingId, topic) {
+        window.location.href = `index.html?meeting_id=${meetingId}&topic=${encodeURIComponent(topic)}`;
+    }
+
+    // 刪除邏輯維持不變
+    async function deleteFolder(folderId, event) {
+        event.stopPropagation();
+        if (!confirm("⚠️ 確定要刪除這個資料夾嗎？\\n裡面的「所有會議紀錄與音檔」將會一併被永久刪除！")) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/folders/${folderId}`, { method: 'DELETE' });
+            if (res.ok) {
+                if (currentSelectedFolderId === folderId) {
+                    currentSelectedFolderId = null;
+                    document.getElementById('meeting-panel-empty').style.display = 'flex';
+                    document.getElementById('meeting-panel-content').style.display = 'none';
+                }
+                loadFolders(); 
+            } else {
+                alert("刪除資料夾失敗！");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("刪除時發生錯誤！");
+        }
+    }
+
+    async function deleteMeeting(meetingId, event) {
+        event.stopPropagation();
+        if (!confirm("⚠️ 確定要刪除這筆會議紀錄嗎？此動作無法復原！")) return;
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}`, { method: 'DELETE' });
+            if (res.ok) {
+                const folderName = document.getElementById('current-folder-title').innerText.replace('📂 ', '');
+                selectFolder(currentSelectedFolderId, folderName);
+            } else {
+                alert("刪除會議失敗！");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("刪除時發生錯誤！");
+        }
+    }
+
+    loadFolders();
+</script>
+</body>
+</html>

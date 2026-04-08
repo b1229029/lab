@@ -83,30 +83,29 @@ def generate_meeting_summary(compiled_context, undiscussed_list=None, template_t
     }
     selected_structure = templates.get(template_type, templates["general"])
 
+    # 🚀 將提示詞改為「強迫填空」模式，防止 AI 偷懶
     prompt = f"""
-請扮演專業的會議秘書。你將收到一份「會議重點回顧」以及「會議素材(含時間)」。
-請產出最終的完整會議紀錄。
+請嚴格扮演專業的會議秘書。根據以下「會議素材」，產出完整的會議紀錄與心智圖。
 
-⚠️【格式要求】請完全依照以下格式輸出，且務必在兩部分之間包含「===MINDMAP_START===」這行分隔符號！
+💡【情境通融指示】：若素材是故事、新聞或單向演講，請變通處理，合理歸納，絕對禁止全部寫「無」。
+
+⚠️【絕對格式要求】：你必須完全依照下方格式輸出，絕不可省略任何項目，且必須輸出「===MINDMAP_START===」作為分隔線！
 
 【第一部分：會議重點紀錄】
 {selected_structure}
 
 ===MINDMAP_START===
-【第二部分：結構化心智圖】
-(💡 心智圖時間軸嚴格規範：
-1. 真實性：必須且只能從下方【會議素材】中擷取真實存在的 [MM:SS] 格式標籤，**絕對禁止**自行發明、推算或捏造任何時間。
-2. 標註邏輯：若該議題跨越多個時間段，請標註「該議題首次提出的時間點」；若為跨段落的綜合結論，無法對應單一具體時間，請保持空白。
-3. 格式：請使用 Markdown 條列式語法呈現階層關係，時間標記統一放在節點最尾端，並空一格。)
-
 # 本次會議核心主題
 - 關鍵議題一 [00:10]
-  - 次要細節說明 [00:15]
-  - 綜合性補充說明 (無明確對應時間則留空)
+  - 細節說明 [00:15]
 - 關鍵議題二 [02:30]
   - 決議事項 [02:55]
 
-【會議素材】
+💡【心智圖嚴格指令，違者嚴懲】：
+1. 不准輸出「第二部分：結構化心智圖」這幾個字！請直接從「# 本次會議核心主題」開始寫起。
+2. 每一個項目（包含父節點與子節點）的最後面，都「必須」加上時間標籤 [MM:SS]！若真的找不到對應時間，請強制標註 [00:00]。絕對不允許出現沒有時間標籤的節點！
+
+以下是【會議素材】：
 {compiled_context}
 """
 
@@ -118,8 +117,8 @@ def generate_meeting_summary(compiled_context, undiscussed_list=None, template_t
     payload = { 
         "model": CHAT_MODEL, 
         "messages": [{"role": "user", "content": prompt}], 
-        "temperature": 0.3 + (0.1 * retry_count), 
-        "max_tokens": 1500, 
+        "temperature": 0.2 + (0.1 * retry_count), 
+        "max_tokens": 4000, 
         "stream": False 
     }
 
@@ -141,12 +140,38 @@ def generate_meeting_summary(compiled_context, undiscussed_list=None, template_t
         summary_part = raw_content
         mindmap_part = ""
         
+        # 切割心智圖與總結
         if "===MINDMAP_START===" in raw_content:
             parts = raw_content.split("===MINDMAP_START===")
             summary_part = parts[0].strip()
-            mindmap_part = parts[1].strip().replace("```markdown", "").replace("```", "").strip()
-            if mindmap_part.startswith("【第二部分：結構化心智圖】"): 
-                mindmap_part = mindmap_part.replace("【第二部分：結構化心智圖】", "").strip()
+            mindmap_part = parts[1].strip()
+        elif "【第二部分：結構化心智圖】" in raw_content:
+            parts = raw_content.split("【第二部分：結構化心智圖】")
+            summary_part = parts[0].strip()
+            mindmap_part = parts[1].strip()
+        elif "**第二部分" in raw_content:
+            parts = raw_content.split("**第二部分")
+            summary_part = parts[0].strip()
+            mindmap_part = parts[1].strip()
+
+        # 🚀 暴力掃除 AI 幻覺產生的多餘標題與 Markdown 代碼塊
+        noises_to_remove = [
+            "【第二部分：結構化心智圖】", 
+            "**【第二部分：結構化心智圖】**", 
+            "**第二部分：結構化心智圖**", 
+            "**第二部分**", 
+            "第二部分：結構化心智圖", 
+            "```markdown", 
+            "```"
+        ]
+        for noise in noises_to_remove:
+            mindmap_part = mindmap_part.replace(noise, "")
+        
+        mindmap_part = mindmap_part.strip()
+        
+        # 🚀 確保根節點 "#" 存在，否則前端畫圖套件會畫出奇怪的空分支
+        if not mindmap_part.startswith("#"):
+            mindmap_part = "# 會議核心總結\n" + mindmap_part
                 
         return json.dumps({"summary": summary_part, "mindmap": mindmap_part})
     except Exception as e:

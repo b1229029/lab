@@ -62,12 +62,14 @@ async def audio_handler(websocket):
                     elif msg_type == 'request_summary':
                         template_type = data.get('template', 'general')
                         compiled_context = ""
+                        
                         if ai_interim_summaries:
-                            compiled_context += "【各階段重點回顧】\n"
-                            for idx, summary in enumerate(ai_interim_summaries): compiled_context += f"第 {idx+1} 階段：\n{summary}\n\n"
-                        tail_transcript = ai_transcript_log[last_interim_index:]
-                        if tail_transcript.strip(): compiled_context += f"【會議尾聲未總結之逐字稿】\n{tail_transcript}"
-                        if not ai_interim_summaries: compiled_context = ai_transcript_log
+                            compiled_context += "【各階段重點回顧 (幫助你快速理解大綱)】\n"
+                            for idx, summary in enumerate(ai_interim_summaries): 
+                                compiled_context += f"第 {idx+1} 階段：\n{summary}\n\n"
+                        
+                        # 🚀 關鍵修改：不管有沒有總結，都把「完整逐字稿」附上，讓 AI 可以精準查閱時間！
+                        compiled_context += f"【完整會議逐字稿 (請務必從這裡尋找並對應 [MM:SS] 時間標記)】\n{ai_transcript_log}"
 
                         undiscussed_topics = []
                         if current_monitor: undiscussed_topics = current_monitor.get_undiscussed_topics()
@@ -191,7 +193,10 @@ async def audio_handler(websocket):
                         last_audio_segment = current_audio_chunk
                         
                         dynamic_prompt = "我們正在討論一般會議。繁體中文。"
-                        result = whisper_model.transcribe(samples_to_process, language="zh", fp16=(DEVICE == "cuda"), initial_prompt=dynamic_prompt)
+                        # ✅ 換成這三行（麥克風非同步加速版）：
+                        loop = asyncio.get_running_loop()
+                        run_transcribe = functools.partial(whisper_model.transcribe, samples_to_process, language="zh", fp16=(DEVICE == "cuda"), initial_prompt=dynamic_prompt)
+                        result = await loop.run_in_executor(None, run_transcribe)
                         
                         clean_text_parts = []
                         for segment in result['segments']:

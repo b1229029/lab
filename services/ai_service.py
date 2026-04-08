@@ -197,7 +197,7 @@ def generate_interim_summary(recent_transcript):
     }
     
     try:
-        res = requests.post(CHAT_ENDPOINT, headers=headers, json=payload, timeout=30)
+        res = requests.post(CHAT_ENDPOINT, headers=headers, json=payload, timeout=60)
         if res.status_code != 200: 
             return f"(伺服器錯誤 {res.status_code})"
         res.raise_for_status()

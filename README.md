@@ -1,6 +1,4 @@
 ***
-
-```markdown
 # 「咪挺」– 你的會議紀錄助手
 # 會議記錄即時專注系統 (Meeting Notes Real-time Focus System)
 

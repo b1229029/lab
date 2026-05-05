@@ -53,7 +53,7 @@
 <body>
 
 <div class="header">
-    <h2 style="margin: 0;">📁 會員專區</h2>
+    <h2 style="margin: 0;"> 會員專區</h2>
     <div style="display: flex; align-items: center; gap: 20px;">
         <span id="welcome-text"></span>
         <button class="btn-logout" onclick="logout()" style="width: auto;">登出</button>
@@ -62,7 +62,7 @@
 
 <div class="container">
     <div class="card folder-panel">
-        <h3>📂 我的資料夾</h3>
+        <h3> 我的資料夾</h3>
         <input type="text" id="new-folder-name" placeholder="新增主題 (例: 畢業專題)">
         <button onclick="createFolder()" style="margin-bottom: 15px;">➕ 建立資料夾</button>
         <ul class="folder-list" id="folder-list"></ul>
@@ -76,7 +76,7 @@
         <h3 id="current-folder-title" style="border-bottom: 2px solid #007bff; padding-bottom: 10px;">資料夾名稱</h3>
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <input type="text" id="new-meeting-title" placeholder="這場會議叫什麼？ (例: 第一次討論)">
-            <button onclick="createMeeting()" style="width: 200px;">🎙️ 開始新會議</button>
+            <button onclick="createMeeting()" style="width: 200px;"> 開始新會議</button>
         </div>
         <ul class="meeting-list" id="meeting-list"></ul>
     </div>
@@ -188,7 +188,7 @@
             li.className = 'meeting-item';
             
             let btnHtml = m.summary_text 
-                ? `<button class="btn-view" onclick="window.location.href='view.html?meeting_id=${m.id}'">📄 檢視紀錄</button>`
+                ? `<button class="btn-view" onclick="window.location.href='view.html?meeting_id=${m.id}'"> 檢視紀錄</button>`
                 : `<button class="btn-enter" onclick="goToMeeting(${m.id}, '${m.title}')">▶️ 繼續會議</button>`;
             
             // 🚀 [修改點] 會議紀錄改為「三個點」下拉選單

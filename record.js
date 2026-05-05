@@ -69,8 +69,21 @@ UIManager.els.actionButton.onclick = async () => {
     if (!UIManager.isAgendaLocked) {
         if (UIManager.myTopics.length === 0) { alert("請至少輸入一個議程！"); return; }
         if (UIManager.currentMode === 'file' && !UIManager.els.audioFileInput.files[0]) { alert("請選擇檔案！"); return; }
+        
+
+        // 新增：抓取與會人員名單
+        const participantsInput = document.getElementById('participants-input');
+        const participantsList = participantsInput ? participantsInput.value.trim() : "";
+
         UIManager.resetMeetingUI();
-        ws.send(JSON.stringify({ type: "setup_agenda", topics: UIManager.myTopics }));
+        
+        // 修改：將 participants 一併透過 WebSocket 送給後端
+        ws.send(JSON.stringify({ 
+            type: "setup_agenda", 
+            topics: UIManager.myTopics,
+            participants: participantsList // 將人名傳送給後端
+        }));
+
     } else { 
         if (AudioManager.isRecording) stopRecording(); 
     }

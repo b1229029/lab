@@ -69,7 +69,7 @@ def summarize_chunk(chunk_text):
 # ==========================================
 # 生成最終會議紀錄與心智圖
 # ==========================================
-def generate_meeting_summary(compiled_context, undiscussed_list=None, template_type="general", retry_count=0):
+def generate_meeting_summary(compiled_context, undiscussed_list=None, template_type="general", retry_count=0, participants_str=""):
     if not compiled_context or len(compiled_context) < 10: 
         return json.dumps({"summary": "會議內容過短，無法生成總結。", "mindmap": ""})
 
@@ -83,9 +83,13 @@ def generate_meeting_summary(compiled_context, undiscussed_list=None, template_t
     }
     selected_structure = templates.get(template_type, templates["general"])
 
+    # 🌟 新增：建構參與者提示詞
+    participant_hint = f"\n【重要資訊】：本次會議參與者包含：{participants_str}。在整理重點時，若有提及相近發音，請優先視為上述人名，並清楚列出他們對應的待辦事項。" if participants_str else ""
+
     # 🚀 將提示詞改為「強迫填空」模式，防止 AI 偷懶
     prompt = f"""
 請嚴格扮演專業的會議秘書。根據以下「會議素材」，產出完整的會議紀錄與心智圖。
+{participant_hint}
 
 💡【情境通融指示】：若素材是故事、新聞或單向演講，請變通處理，合理歸納，絕對禁止全部寫「無」。
 

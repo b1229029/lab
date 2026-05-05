@@ -40,6 +40,9 @@ async def audio_handler(websocket):
     upload_file_path = None
     cumulative_audio_seconds = 0.0 
 
+    # 修改：初始化當前會議的參與者名單變數
+    current_participants = ""
+
     try:
         async for message in websocket:
             if isinstance(message, str):
@@ -50,6 +53,9 @@ async def audio_handler(websocket):
                         user_topics = data.get('topics', [])
                         current_monitor = AgendaMonitor(user_topics)
                         
+                        # 修改：接收前端傳來的參與者名單
+                        current_participants = data.get('participants', "")
+
                         server_clean_buffer = ""
                         ai_transcript_log = ""
                         ai_interim_summaries = []
@@ -74,8 +80,18 @@ async def audio_handler(websocket):
                         undiscussed_topics = []
                         if current_monitor: undiscussed_topics = current_monitor.get_undiscussed_topics()
                         loop = asyncio.get_running_loop()
-                        json_result = await loop.run_in_executor(None, generate_meeting_summary, compiled_context, undiscussed_topics, template_type)
-                        
+
+                        # 修改：將 current_participants 傳遞給 AI 總結函式
+                        json_result = await loop.run_in_executor(
+                            None, 
+                            generate_meeting_summary, 
+                            compiled_context, 
+                            undiscussed_topics, 
+                            template_type,
+                            0, # retry_count 預設為 0
+                            current_participants # 傳入參與者名單
+                        )
+
                         res_dict = json.loads(json_result)
                         if "error" in res_dict: await websocket.send(json.dumps({"type": "error", "message": res_dict["error"]}))
                         else: await websocket.send(json.dumps({"type": "summary_result", "data": json_result}))
@@ -114,12 +130,17 @@ async def audio_handler(websocket):
                         is_file_mode = True
                         upload_file_handle = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
                         upload_file_path = upload_file_handle.name
+                    
                     elif msg_type == 'end_file_upload':
                         if upload_file_handle: upload_file_handle.close()
                         await websocket.send(json.dumps({"type": "upload_progress", "message": "Whisper 轉錄中 (可能需要幾分鐘)..."}))
                         try:
                             loop = asyncio.get_running_loop()
-                            dynamic_prompt = "我們正在討論一般會議。繁體中文。"
+
+                            # 修改：(檔案上傳模式) 將參與者名單加入 Whisper Prompt
+                            base_prompt = "我們正在討論一般會議。繁體中文。"
+                            dynamic_prompt = f"{base_prompt} 本次會議參與者有：{current_participants}。" if current_participants else base_prompt
+
                             run_transcribe = functools.partial(whisper_model.transcribe, upload_file_path, language="zh", fp16=(DEVICE == "cuda"), initial_prompt=dynamic_prompt)
                             result = await loop.run_in_executor(None, run_transcribe)
                             
@@ -158,7 +179,18 @@ async def audio_handler(websocket):
                             await websocket.send(json.dumps({"type": "upload_progress", "message": "正在生成最終總結報告與心智圖..."}))
                             undiscussed_topics = []
                             if current_monitor: undiscussed_topics = current_monitor.get_undiscussed_topics()
-                            json_result = await loop.run_in_executor(None, generate_meeting_summary, compiled_context, undiscussed_topics, "general")
+                            
+                            # 修改：(檔案上傳模式) 將名單傳遞給 AI 總結
+                            json_result = await loop.run_in_executor(
+                                None, 
+                                generate_meeting_summary, 
+                                compiled_context, 
+                                undiscussed_topics, 
+                                "general",
+                                0, # retry_count
+                                current_participants
+                            )
+
                             res_dict = json.loads(json_result)
                             if "error" in res_dict: await websocket.send(json.dumps({"type": "error", "message": res_dict["error"]}))
                             else: await websocket.send(json.dumps({"type": "summary_result", "data": json_result}))
@@ -191,8 +223,11 @@ async def audio_handler(websocket):
                             samples_to_process = np.concatenate((samples_prefix, samples_current))
                             overlap_offset = len(prefix_segment) / 1000.0
                         last_audio_segment = current_audio_chunk
+
+                        # 修改：(麥克風即時模式) 將參與者名單加入 Whisper Prompt
+                        base_prompt = "我們正在討論一般會議。繁體中文。"
+                        dynamic_prompt = f"{base_prompt} 本次會議參與者有：{current_participants}。" if current_participants else base_prompt
                         
-                        dynamic_prompt = "我們正在討論一般會議。繁體中文。"
                         # ✅ 換成這三行（麥克風非同步加速版）：
                         loop = asyncio.get_running_loop()
                         run_transcribe = functools.partial(whisper_model.transcribe, samples_to_process, language="zh", fp16=(DEVICE == "cuda"), initial_prompt=dynamic_prompt)

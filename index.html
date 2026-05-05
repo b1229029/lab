@@ -90,7 +90,7 @@
 <body>
 
     <div class="navbar">
-        <h2>🎙️ Whisper 會議助手</h2>
+        <h2> Whisper 會議助手</h2>
         <button class="nav-btn active" onclick="switchPage('home')">1. 會議進行</button>
         <button class="nav-btn" onclick="switchPage('summary')">2. AI 總結報告</button>
         <button class="nav-btn" onclick="switchPage('mindmap')">3. 會議心智圖</button>
@@ -109,14 +109,14 @@
                 <div class="card control-panel">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                         <div>
-                            <label><input type="radio" name="mode" value="mic" checked onchange="toggleMode()"> 🎙️ 麥克風</label>
-                            <label style="margin-left:15px;"><input type="radio" name="mode" value="file" onchange="toggleMode()"> 📂 匯入檔案</label>
+                            <label><input type="radio" name="mode" value="mic" checked onchange="toggleMode()">  麥克風</label>
+                            <label style="margin-left:15px;"><input type="radio" name="mode" value="file" onchange="toggleMode()">  匯入檔案</label>
                         </div>
                         <select id="template-select" style="padding: 5px;">
-                            <option value="general">📋 標準會議</option>
-                            <option value="brainstorming">💡 腦力激盪</option>
-                            <option value="interview">👤 人才面試</option>
-                            <option value="weekly">📅 團隊週報</option>
+                            <option value="general"> 標準會議</option>
+                            <option value="brainstorming"> 腦力激盪</option>
+                            <option value="interview"> 人才面試</option>
+                            <option value="weekly"> 團隊週報</option>
                         </select>
                     </div>
 
@@ -145,7 +145,7 @@
 
             <div class="side-col">
                 <div class="card">
-                    <h3>📊 智慧議程監控</h3>
+                    <h3> 智慧議程監控</h3>
                     <div class="input-group" id="input-area">
                         <input type="text" id="new-topic-input" placeholder="輸入議程...">
                         <button id="add-topic-btn" class="btn-success">+</button>
@@ -156,14 +156,14 @@
                 </div>
 
                 <div class="card" id="interim-summary-area">
-                    <h3>⏱️ 每分鐘即時重點</h3>
+                    <h3> 每分鐘即時重點</h3>
                     <div id="interim-summary-box" style="font-size:0.9em; color:#333; max-height: 250px; overflow-y: auto; white-space: pre-wrap; background: #f9f9f9; padding: 10px; border-radius: 4px;">
                         會議開始後，將每分鐘自動更新...
                     </div>
                 </div>
 
                 <div class="card" id="next-meeting-area">
-                    <h3>📅 預約跟進會議</h3>
+                    <h3> 預約跟進會議</h3>
                     <p style="font-size:0.8em; color:#666;">(AI 總結後自動填入建議)</p>
                     <label>下一次議程：</label>
                     <textarea id="next-agenda-preview" rows="3" placeholder="待辦事項..."></textarea>
@@ -180,10 +180,10 @@
         <div id="page-summary" class="page-section">
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>🤖 AI 會議總結報告</h3>
+                    <h3> AI 會議總結報告</h3>
                     <div>
-                        <button id="downloadBtn" class="btn-info" disabled>📥 下載 .md</button>
-                        <button id="copyBtn" class="btn-info" disabled>📋 複製</button>
+                        <button id="downloadBtn" class="btn-info" disabled> 下載 .md</button>
+                        <button id="copyBtn" class="btn-info" disabled> 複製</button>
                     </div>
                 </div>
                 <div id="ai-summary-box" style="flex: 1; background: #f8f9fa; padding: 20px; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6;">
@@ -198,7 +198,7 @@
         <div id="page-mindmap" class="page-section">
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3>🧠 結構化心智圖</h3>
+                    <h3> 結構化心智圖</h3>
                     <audio id="mindmap-audio-player" controls style="height: 35px;"></audio>
                 </div>
                 <div id="mindmap-container">
@@ -210,7 +210,7 @@
     
     <script>
         if(window.currentUser) {
-            document.getElementById('welcome-msg').innerText = "👤 歡迎, " + window.currentUser.username + " (點此返回列表)";
+            document.getElementById('welcome-msg').innerText = " 歡迎, " + window.currentUser.username + " (點此返回列表)";
         }
     </script>
 

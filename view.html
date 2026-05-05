@@ -26,26 +26,26 @@
 
     <div class="header">
         <h2 id="meeting-title" style="margin: 0; font-size: 20px;">載入中...</h2>
-        <a href="dashboard.html" class="btn-back">🔙 返回專案列表</a>
+        <a href="dashboard.html" class="btn-back"> 返回專案列表</a>
     </div>
 
     <div class="container">
         <div class="col-3">
             <div class="card">
-                <h3>📝 完整逐字稿</h3>
+                <h3> 完整逐字稿</h3>
                 <div id="transcript-content">逐字稿載入中...</div>
             </div>
         </div>
         <div class="col-3">
             <div class="card">
-                <h3>🤖 AI 會議總結報告</h3>
+                <h3> AI 會議總結報告</h3>
                 <div id="summary-content">總結載入中...</div>
             </div>
         </div>
         <div class="col-3">
             <div class="card">
                 <h3 style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
-                    <span>🧠 結構化心智圖 (點擊自動播片段)</span>
+                    <span> 結構化心智圖 (點擊自動播片段)</span>
                     <div id="audio-container"></div>
                 </h3>
                 <div id="mindmap-container">
@@ -74,7 +74,7 @@
                 if (!response.ok) throw new Error("找不到會議資料");
                 const data = await response.json();
 
-                document.getElementById('meeting-title').innerText = `📄 ${data.title} (歷史紀錄)`;
+                document.getElementById('meeting-title').innerText = ` ${data.title} (歷史紀錄)`;
                 document.getElementById('transcript-content').innerText = data.transcript_text || "無逐字稿資料";
                 document.getElementById('summary-content').innerText = data.summary_text || "無總結資料";
 
@@ -90,7 +90,7 @@
                     player.addEventListener('timeupdate', () => {
                         if (targetEndTime !== null && player.currentTime >= targetEndTime) {
                             player.pause(); 
-                            console.log("⏸️ 已播放完畢此片段，自動暫停");
+                            console.log("⏸ 已播放完畢此片段，自動暫停");
                             targetEndTime = null; 
                         }
                     });

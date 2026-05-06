@@ -64,7 +64,12 @@ const UIManager = {
         const targetPage = document.getElementById(`page-${pageName}`);
         if(targetPage) targetPage.classList.add('active');
         
-        const btnIndex = pageName === 'home' ? 0 : pageName === 'summary' ? 1 : 2;
+        // 🚀 關鍵修改：支援 4 個頁面的切換邏輯
+        let btnIndex = 0;
+        if (pageName === 'summary') btnIndex = 1;
+        else if (pageName === 'mindmap') btnIndex = 2;
+        else if (pageName === 'chat') btnIndex = 3;
+
         const navBtns = document.querySelectorAll('.nav-btn');
         if(navBtns[btnIndex]) navBtns[btnIndex].classList.add('active');
 
@@ -112,7 +117,6 @@ const UIManager = {
     },
 
     updateTranscript(data) {
-        // 🚀 接收後端算好的時間戳，若無則預設為片段
         const ts = data.ts ? data.ts.trim() : `[片段]`;
         const p = document.createElement('p'); p.id = `transcript-${this.chunkCounter}`; 
         
@@ -123,7 +127,6 @@ const UIManager = {
         p.innerHTML = `${tag} <strong>${ts}</strong> ${data.text}`; p.style.padding = '5px'; 
         this.els.liveTranscript.appendChild(p); this.els.liveTranscript.scrollTop = this.els.liveTranscript.scrollHeight;
         
-        // 推入紀錄陣列，確保儲存帶有時間戳
         this.fullTranscriptLog.push(`${ts} ${data.text}`);
         
         if (data.hit_topics && data.hit_topics.length > 0) {

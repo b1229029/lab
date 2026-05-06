@@ -2,108 +2,167 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>檢視會議紀錄</title>
+    <title>檢視會議紀錄 - 分頁模式</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <script src="https://fastly.jsdelivr.net/npm/markmap-lib@0.15.4/dist/browser/index.min.js"></script>
     <script src="https://fastly.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.min.js"></script>
 
     <style>
-        body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
-        .header { background: #343a40; color: white; padding: 15px 30px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .btn-back { background: transparent; border: 1px solid #fff; color: #fff; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: 0.2s; text-decoration: none; font-size: 14px; }
-        .btn-back:hover { background: #fff; color: #343a40; }
-        .container { display: flex; gap: 15px; flex: 1; min-height: 0; }
-        .col-3 { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
-        h3 { margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px; color: #333; font-size: 16px; flex-shrink: 0; }
-        #transcript-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.8; color: #444; background: #f9fff9; padding: 15px; border-left: 5px solid #28a745; border-radius: 4px; font-size: 14px; }
-        #summary-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #444; font-size: 14px; }
+        body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* 1. 導航列樣式 - 參考 index.html */
+        .navbar {
+            background-color: #343a40; padding: 10px 20px; display: flex; gap: 10px; align-items: center; color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); flex-shrink: 0;
+        }
+        .navbar h2 { margin: 0 20px 0 0; font-size: 1.2em; color: #fff; }
+        .nav-btn {
+            background: transparent; border: 1px solid #6c757d; color: #ddd; padding: 8px 15px; border-radius: 20px; cursor: pointer; transition: 0.3s;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .nav-btn.active { background: #007bff; border-color: #007bff; color: white; font-weight: bold; }
+
+        .btn-back { margin-left: auto; background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 0.9em; transition: 0.2s; }
+        .btn-back:hover { background: #dc3545; color: white; }
+
+        /* 2. 容器與分頁邏輯 */
+        .container { flex: 1; padding: 20px; overflow: hidden; position: relative; }
+        .page-section { display: none; height: 100%; gap: 20px; animation: fadeIn 0.3s; flex-direction: column; max-width: 1000px; margin: 0 auto; width: 100%; }
+        .page-section.active { display: flex; }
+
+        .card { background: #fff; padding: 20px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+        h3 { margin-top: 0; color: #333; border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 15px; flex-shrink: 0; }
+
+        /* 內容區塊細節 */
+        #transcript-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.8; color: #444; background: #f9fff9; padding: 20px; border-left: 5px solid #28a745; border-radius: 4px; font-size: 15px; }
+        #summary-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #333; font-size: 15px; }
         #mindmap-container { flex: 1; border: 1px solid #ddd; border-radius: 8px; background: #fff; overflow: hidden; }
         #markmap-svg { width: 100%; height: 100%; }
+
+        /* 聊天室專屬 */
+        #chat-history { flex: 1; overflow-y: auto; background: #f4f6f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .chat-input-area { display: flex; gap: 10px; flex-shrink: 0; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 1em; }
+        .btn-primary { background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h2 id="meeting-title" style="margin: 0; font-size: 20px;">載入中...</h2>
-        <a href="dashboard.html" class="btn-back"> 返回專案列表</a>
+    <div class="navbar">
+        <h2 id="navbar-title">載入中...</h2>
+        <button class="nav-btn active" onclick="switchPage('transcript')">1. 完整逐字稿</button>
+        <button class="nav-btn" onclick="switchPage('summary')">2. 會議總結報告</button>
+        <button class="nav-btn" onclick="switchPage('mindmap')">3. 結構化心智圖</button>
+        <button class="nav-btn" onclick="switchPage('chat')">4. 會議問答機器人</button>
+        
+        <a href="dashboard.html" class="btn-back"> 返回列表</a>
     </div>
 
     <div class="container">
-        <div class="col-3">
+        <div id="page-transcript" class="page-section active">
             <div class="card">
-                <h3> 完整逐字稿</h3>
-                <div id="transcript-content">逐字稿載入中...</div>
+                <h3> 完整逐字稿內容</h3>
+                <div id="transcript-content">內容載入中...</div>
             </div>
         </div>
-        <div class="col-3">
+
+        <div id="page-summary" class="page-section">
             <div class="card">
                 <h3> AI 會議總結報告</h3>
                 <div id="summary-content">總結載入中...</div>
             </div>
         </div>
-        <div class="col-3">
+
+        <div id="page-mindmap" class="page-section">
             <div class="card">
-                <h3 style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
-                    <span> 結構化心智圖 (點擊自動播片段)</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3> 結構化心智圖 (點擊節點跳轉播放)</h3>
                     <div id="audio-container"></div>
-                </h3>
+                </div>
                 <div id="mindmap-container">
                     <svg id="markmap-svg"></svg>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-chat" class="page-section">
+            <div class="card" style="border: 2px solid #007bff;">
+                <h3>💬 會議問答助手 (RAG 歷史檢索)</h3>
+                <div id="chat-history">
+                    <div style="color: #555; font-size: 0.9em; margin-bottom: 8px;">助手：您好！我是這場會議的 AI 助手。您可以問我任何關於這場會議的細節。</div>
+                </div>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" placeholder="請輸入您的問題...">
+                    <button id="send-chat-btn" class="btn-primary">發送</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        const API_BASE_URL = "http://127.0.0.1:8000";
+        const API_BASE_URL = "http://127.0.0.1:8000"; 
         const urlParams = new URLSearchParams(window.location.search);
         const meetingId = urlParams.get('meeting_id');
 
         let mindmapTimestamps = [];
         let targetEndTime = null;
+        let pendingMindmapRoot = null;
 
-        if (!meetingId) {
-            alert("無效的會議 ID");
-            window.location.href = "dashboard.html";
+        // --- 分頁切換邏輯 ---
+        function switchPage(pageName) {
+            document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`page-${pageName}`).classList.add('active');
+            
+            // 找到對應的按鈕並變亮
+            const btnIndex = pageName === 'transcript' ? 0 : pageName === 'summary' ? 1 : pageName === 'mindmap' ? 2 : 3;
+            document.querySelectorAll('.nav-btn')[btnIndex].classList.add('active');
+
+            // 如果切換到心智圖，自動調整大小
+            if (pageName === 'mindmap' && window.mm) {
+                setTimeout(() => window.mm.fit(), 100);
+            }
         }
 
+        // --- 載入資料庫資料 ---
         async function loadMeetingData() {
+            if (!meetingId) { alert("無效的會議 ID"); window.location.href = "dashboard.html"; return; }
+            
             try {
                 const response = await fetch(`${API_BASE_URL}/meetings/${meetingId}`);
-                if (!response.ok) throw new Error("找不到會議資料");
                 const data = await response.json();
 
-                document.getElementById('meeting-title').innerText = ` ${data.title} (歷史紀錄)`;
-                document.getElementById('transcript-content').innerText = data.transcript_text || "無逐字稿資料";
+                document.getElementById('navbar-title').innerText = ` ${data.title}`;
+                document.getElementById('transcript-content').innerText = data.transcript_text || "無資料";
                 document.getElementById('summary-content').innerText = data.summary_text || "無總結資料";
 
+                // 音檔播放器
                 if (data.audio_file_path) {
                     document.getElementById('audio-container').innerHTML = `
-                        <audio id="meeting-audio-player" controls style="height: 35px; outline: none; max-width: 100%;">
+                        <audio id="meeting-audio-player" controls style="height: 35px;">
                             <source src="${API_BASE_URL}/${data.audio_file_path}" type="audio/webm">
-                            您的瀏覽器不支援音訊播放。
                         </audio>
                     `;
-                    
                     const player = document.getElementById('meeting-audio-player');
-                    player.addEventListener('timeupdate', () => {
+                    player.ontimeupdate = () => {
                         if (targetEndTime !== null && player.currentTime >= targetEndTime) {
-                            player.pause(); 
-                            console.log("⏸ 已播放完畢此片段，自動暫停");
-                            targetEndTime = null; 
+                            player.pause(); targetEndTime = null;
                         }
-                    });
+                    };
                 }
 
+                // 心智圖渲染
                 if (data.mindmap_data) {
                     const { Markmap, Transformer } = window.markmap;
                     const transformer = new Transformer();
                     const { root } = transformer.transform(data.mindmap_data);
+                    pendingMindmapRoot = root;
                     
                     mindmapTimestamps = [];
-                    function extractTimes(node) {
-                        if(!node) return;
+                    const extractTimes = (node) => {
                         if(node.content) {
                             const m = node.content.match(/\[(\d+):(\d+)\]/);
                             if(m) {
@@ -112,65 +171,65 @@
                             }
                         }
                         if(node.children) node.children.forEach(extractTimes);
-                    }
+                    };
                     extractTimes(root);
                     mindmapTimestamps.sort((a, b) => a - b);
 
-                    const svgEl = document.getElementById('markmap-svg');
-                    svgEl.innerHTML = '';
-                    window.mm = Markmap.create(svgEl, null, root);
-                } else {
-                    document.getElementById('mindmap-container').innerHTML = "<p style='padding:20px; color:#888; text-align:center;'>無心智圖資料</p>";
+                    window.mm = Markmap.create(document.getElementById('markmap-svg'), null, root);
                 }
-            } catch (error) {
-                console.error(error);
-                document.getElementById('transcript-content').innerText = "讀取失敗：" + error.message;
-                document.getElementById('summary-content').innerText = "讀取失敗：" + error.message;
-            }
+            } catch (err) { console.error(err); }
         }
 
-        function setupMindmapClickJump() {
-            const mindmapSvg = document.getElementById('markmap-svg');
-            if (mindmapSvg) {
-                mindmapSvg.addEventListener('click', (e) => {
-                    const nodeGroup = e.target.closest('.markmap-node');
-                    if (nodeGroup && window.d3) {
-                        const datum = window.d3.select(nodeGroup).datum();
-                        if (datum && datum.data && datum.data.content) {
-                            const contentText = datum.data.content;
-                            const timeMatch = contentText.match(/\[(\d+):(\d+)\]/);
-                            if (timeMatch) {
-                                const minutes = parseInt(timeMatch[1], 10);
-                                const seconds = parseInt(timeMatch[2], 10);
-                                const totalSeconds = (minutes * 60) + seconds;
-                                
-                                const player = document.getElementById('meeting-audio-player');
-                                if (player) {
-                                    const currentIndex = mindmapTimestamps.indexOf(totalSeconds);
-                                    if (currentIndex !== -1 && currentIndex < mindmapTimestamps.length - 1) {
-                                        targetEndTime = mindmapTimestamps[currentIndex + 1];
-                                    } else {
-                                        targetEndTime = null; 
-                                    }
-
-                                    // 🚀 [核心優化] 往前退 2 秒播放，讓語氣跟上下文不會被生硬切斷
-                                    let jumpTime = totalSeconds - 2; 
-                                    if (jumpTime < 0) jumpTime = 0;
-
-                                    player.currentTime = jumpTime;
-                                    player.play();
-                                }
-                            }
-                        }
-                    }
-                });
+        // --- 心智圖跳轉功能 ---
+        document.getElementById('markmap-svg').onclick = (e) => {
+            const nodeGroup = e.target.closest('.markmap-node');
+            if (nodeGroup && window.d3) {
+                const datum = window.d3.select(nodeGroup).datum();
+                const m = datum.data.content.match(/\[(\d+):(\d+)\]/);
+                if (m) {
+                    const totalSec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+                    const player = document.getElementById('meeting-audio-player');
+                    const idx = mindmapTimestamps.indexOf(totalSec);
+                    targetEndTime = (idx !== -1 && idx < mindmapTimestamps.length - 1) ? mindmapTimestamps[idx + 1] : null;
+                    player.currentTime = Math.max(0, totalSec - 2);
+                    player.play();
+                }
             }
-        }
-
-        window.onload = async function() {
-            await loadMeetingData(); 
-            setupMindmapClickJump(); 
         };
+
+        // --- 聊天機器人邏輯 ---
+        const sendBtn = document.getElementById('send-chat-btn');
+        const chatInput = document.getElementById('chat-input');
+        
+        async function handleSend() {
+            const question = chatInput.value.trim();
+            if (!question) return;
+            
+            const historyEl = document.getElementById('chat-history');
+            historyEl.innerHTML += `<div style="text-align: right; margin-bottom: 8px;"><span style="background: #007bff; color: white; padding: 5px 10px; border-radius: 15px; display: inline-block;">${question}</span></div>`;
+            chatInput.value = '';
+            
+            const loadingId = 'loading-' + Date.now();
+            historyEl.innerHTML += `<div id="${loadingId}" style="color: #888; font-size: 0.9em; margin-bottom: 8px;">思考中...</div>`;
+            historyEl.scrollTop = historyEl.scrollHeight;
+
+            try {
+                const res = await fetch(`${API_BASE_URL}/meetings/${meetingId}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+                const data = await res.json();
+                document.getElementById(loadingId).remove();
+                historyEl.innerHTML += `<div style="margin-bottom: 8px;"><span style="background: #e9ecef; color: #333; padding: 8px 12px; border-radius: 15px; display: inline-block; max-width: 80%; line-height: 1.5;">${data.answer.replace(/\n/g, '<br>')}</span></div>`;
+                historyEl.scrollTop = historyEl.scrollHeight;
+            } catch (err) { document.getElementById(loadingId).innerText = "❌ 錯誤：無法連接伺服器"; }
+        }
+
+        sendBtn.onclick = handleSend;
+        chatInput.onkeypress = (e) => { if(e.key === 'Enter') handleSend(); };
+
+        window.onload = loadMeetingData;
     </script>
 </body>
 </html>

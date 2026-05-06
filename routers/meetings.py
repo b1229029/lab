@@ -4,8 +4,13 @@ import os
 import shutil
 from database import get_db_connection
 from schemas import MeetingCreate, MeetingUpdate
+from pydantic import BaseModel
+from services.rag_service import chat_with_meeting_rag
 
 router = APIRouter(tags=["會議管理"])
+
+class ChatRequest(BaseModel):
+    question: str
 
 @router.post("/meetings")
 def create_meeting(request: MeetingCreate):
@@ -103,6 +108,29 @@ def delete_meeting(meeting_id: int):
         return {"message": "會議紀錄刪除成功"}
     except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail=f"資料庫錯誤: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+# 🚀 聊天機器人路由（修復縮排與對齊）
+@router.post("/meetings/{meeting_id}/chat")
+def ask_meeting_bot(meeting_id: int, request: ChatRequest):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT transcript_text, summary_text FROM meetings WHERE id = %s", (meeting_id,))
+        meeting = cursor.fetchone()
+        if not meeting:
+            raise HTTPException(status_code=404, detail="找不到此會議")
+
+        transcript = meeting.get("transcript_text", "")
+        summary = meeting.get("summary_text", "")
+
+        if not transcript:
+            return {"answer": "這場會議目前沒有逐字稿紀錄，無法回答問題喔！"}
+
+        answer = chat_with_meeting_rag(request.question, transcript, summary)
+        return {"answer": answer}
     finally:
         cursor.close()
         conn.close()

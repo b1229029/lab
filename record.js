@@ -210,3 +210,51 @@ async function saveMeetingDataToDB(summary, mindmap) {
 
 // 啟動系統
 setupWebSocket();
+// ==========================================
+// 🚀 會議問答機器人前端邏輯
+// ==========================================
+const sendChatBtn = document.getElementById('send-chat-btn');
+const chatInput = document.getElementById('chat-input');
+
+if (sendChatBtn && chatInput) {
+    const handleSendChat = async () => {
+        const historyEl = document.getElementById('chat-history');
+        const question = chatInput.value.trim();
+
+        if (!question) return;
+        if (!currentMeetingId) {
+            alert("⚠️ 找不到會議 ID！\n請問答功能必須在「已儲存的會議」中才能使用。");
+            return;
+        }
+
+        historyEl.innerHTML += `<div style="text-align: right; margin-bottom: 8px;"><span style="background: #007bff; color: white; padding: 5px 10px; border-radius: 15px; display: inline-block;">${question}</span></div>`;
+        chatInput.value = '';
+
+        const loadingId = 'loading-' + Date.now();
+        historyEl.innerHTML += `<div id="${loadingId}" style="color: #888; font-size: 0.9em; margin-bottom: 8px;">🤖 助手思考中...</div>`;
+        historyEl.scrollTop = historyEl.scrollHeight;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/meetings/${currentMeetingId}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question: question })
+            });
+            const data = await response.json();
+
+            const loadingEl = document.getElementById(loadingId);
+            if(loadingEl) loadingEl.remove();
+
+            historyEl.innerHTML += `<div style="margin-bottom: 8px;"><span style="background: #e9ecef; color: #333; padding: 8px 12px; border-radius: 15px; display: inline-block; max-width: 80%; line-height: 1.5; text-align: left;">🤖 ${data.answer.replace(/\n/g, '<br>')}</span></div>`;
+            historyEl.scrollTop = historyEl.scrollHeight;
+        } catch (err) {
+            const loadingEl = document.getElementById(loadingId);
+            if(loadingEl) loadingEl.innerText = "❌ 發生錯誤，無法連接後端。";
+        }
+    };
+
+    sendChatBtn.onclick = handleSendChat;
+    chatInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') handleSendChat();
+    });
+}

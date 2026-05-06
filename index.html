@@ -33,6 +33,7 @@
         
         #page-summary { flex-direction: column; max-width: 900px; margin: 0 auto; overflow-y: auto; }
         #page-mindmap { flex-direction: column; height: 100%; }
+        #page-chat { flex-direction: column; max-width: 900px; margin: 0 auto; width: 100%; }
 
         .card { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; flex-direction: column; }
         .card.control-panel { flex: 0 0 auto; margin-bottom: 15px; }
@@ -94,6 +95,7 @@
         <button class="nav-btn active" onclick="switchPage('home')">1. 會議進行</button>
         <button class="nav-btn" onclick="switchPage('summary')">2. AI 總結報告</button>
         <button class="nav-btn" onclick="switchPage('mindmap')">3. 會議心智圖</button>
+        <button class="nav-btn" onclick="switchPage('chat')">4. AI 問答助手</button>
         
         <div style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
             <button id="welcome-msg" onclick="window.location.href='dashboard.html'" style="background: transparent; border: none; color: #80bdff; font-weight: bold; cursor: pointer; font-size: 0.9em; text-decoration: underline; padding: 0;"></button>
@@ -211,6 +213,19 @@
                 </div>
             </div>
         </div>
+
+        <div id="page-chat" class="page-section">
+            <div class="card" style="height: 100%; display: flex; flex-direction: column; border: 2px solid #007bff;">
+                <h3>💬 會議問答機器人</h3>
+                <div id="chat-history" style="flex: 1; overflow-y: auto; background: #f4f6f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="color: #555; font-size: 0.9em; margin-bottom: 8px;">助手：有什麼關於這場會議的問題嗎？例如「這場會議有什麼注意事項？」</div>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="chat-input" placeholder="詢問會議內容..." style="flex: 1; padding: 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 1.05em;">
+                    <button id="send-chat-btn" class="btn-primary" style="width: 100px; font-size: 1.05em;">發送</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script>
@@ -221,6 +236,6 @@
 
     <script src="audio_manager.js"></script>
     <script src="ui_manager.js"></script>
-    <script src="record.js?v=2024"></script>
+    <script src="record.js?v=2025"></script>
 </body>
 </html>

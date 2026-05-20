@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-# 👇 引入我們剛剛拆分好的 Routers
-from routers import auth, folders, meetings
+# 👇 引入所有的 Routers (包含最新加入的 vision)
+from routers import auth, folders, meetings, vision
 
 app = FastAPI(title="Whisper 會議助手 API")
 
@@ -14,7 +14,7 @@ os.makedirs("uploads", exist_ok=True)
 # 讓前端可以透過 URL 直接讀取 uploads 資料夾內的檔案
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# 設定 CORS
+# 設定 CORS (允許前端跨域請求)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,3 +27,4 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(folders.router)
 app.include_router(meetings.router)
+app.include_router(vision.router) # 👉 新增的圖片辨識路由

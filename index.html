@@ -237,5 +237,77 @@
     <script src="audio_manager.js"></script>
     <script src="ui_manager.js"></script>
     <script src="record.js?v=2025"></script>
-</body>
+
+    <script>
+        const imageInput = document.getElementById('image-input');
+        const imgStatus = document.getElementById('img-status');
+        const btnUploadImage = document.getElementById('btn-upload-image');
+        const fullTranscript = document.getElementById('full-transcript'); 
+
+        // 1. 監聽圖片選擇事件：當使用者選好圖片時，顯示檔名和分析按鈕
+        imageInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                imgStatus.textContent = '已選擇: ' + this.files[0].name;
+                btnUploadImage.style.display = 'inline-block';
+            } else {
+                imgStatus.textContent = '未選擇';
+                btnUploadImage.style.display = 'none';
+            }
+        });
+
+        // 2. 監聽按鈕點擊事件：按下「開始分析」發送請求給後端
+        btnUploadImage.addEventListener('click', async function() {
+            if (!imageInput.files || imageInput.files.length === 0) {
+                alert("請先選擇一張圖片！");
+                return;
+            }
+
+            const imageFile = imageInput.files[0];
+            const formData = new FormData();
+            formData.append("file", imageFile);
+
+            // 改變按鈕狀態，防止重複點擊
+            const originalText = btnUploadImage.textContent;
+            btnUploadImage.textContent = '⏳ 分析中...';
+            btnUploadImage.disabled = true;
+
+            try {
+                // 呼叫 FastAPI 後端
+                const response = await fetch("http://127.0.0.1:8000/vision/analyze", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.status === "success") {
+                    // 將回傳的結果加入到「完整逐字稿」區塊，並加上漂亮的背景色
+                    const resultHtml = `
+                    <div style="background-color: #e3f2fd; padding: 10px; border-radius: 5px; border-left: 4px solid #17a2b8; margin: 10px 0;">
+                        <strong>🖼️ [圖片分析] ${data.filename}</strong><br>
+                        ${data.description.replace(/\n/g, '<br>')}
+                    </div>`;
+                    
+                    fullTranscript.innerHTML += resultHtml;
+                    fullTranscript.scrollTop = fullTranscript.scrollHeight; // 自動滾動到底部
+                    
+                    // 重置上傳區塊的狀態
+                    imageInput.value = '';
+                    imgStatus.textContent = '✅ 分析完成';
+                    btnUploadImage.style.display = 'none';
+                } else {
+                    console.error("後端回報錯誤:", data);
+                    alert("圖片分析失敗：" + (data.detail || "未知錯誤"));
+                }
+            } catch (error) {
+                console.error("連線錯誤:", error);
+                alert("無法連線到伺服器，請確認 uvicorn 後端是否已啟動！");
+            } finally {
+                // 恢復按鈕狀態
+                btnUploadImage.textContent = originalText;
+                btnUploadImage.disabled = false;
+            }
+        });
+    </script>
+    </body>
 </html>

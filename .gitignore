@@ -4,5 +4,3 @@ uploads/
 *.exe
 credentials.json
 token.json
-vision.py
-ai_service.py

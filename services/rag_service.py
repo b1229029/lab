@@ -5,10 +5,16 @@ from sentence_transformers import util
 from services.audio_service import embedding_model  # 重用 bge-m3 模型
 from services.ai_service import CHAT_ENDPOINT, NEW_API_KEY, CHAT_MODEL
 
-def chat_with_meeting_rag(question: str, full_transcript: str, summary_text: str):
-    # 1. 將會議後完整的逐字稿，每 1000 字切成一塊
+def chat_with_meeting_rag(question: str, full_transcript: str, summary_text: str, image_analysis_text: str = ""):
+    image_section = ""
+    if image_analysis_text:
+        image_section = f"\n\n【圖片分析結果】\n{image_analysis_text}"
+
+    searchable_text = (full_transcript or "") + image_section
+
+    # 1. 將會議後完整的逐字稿與圖片分析結果，每 1000 字切成一塊
     chunk_size = 1000
-    chunks = [full_transcript[i:i+chunk_size] for i in range(0, len(full_transcript), chunk_size)]
+    chunks = [searchable_text[i:i+chunk_size] for i in range(0, len(searchable_text), chunk_size)]
     
     # 如果內容很少，直接全給；如果很多，就進行 RAG 向量檢索
     if len(chunks) > 2:
@@ -25,7 +31,7 @@ def chat_with_meeting_rag(question: str, full_transcript: str, summary_text: str
         retrieved_chunks = [chunks[idx] for idx in top_results[1]]
         retrieved_context = "\n...\n".join(retrieved_chunks)
     else:
-        retrieved_context = full_transcript
+        retrieved_context = searchable_text
 
     # 2. 組合終極 Prompt (將全局總結與局部細節結合)
     prompt = f"""
@@ -34,6 +40,9 @@ def chat_with_meeting_rag(question: str, full_transcript: str, summary_text: str
 
     【會議重點總結 (幫助你掌握全局)】：
     {summary_text}
+
+    【圖片分析結果 (會議中上傳圖片的內容，若與問題相關請一併引用)】：
+    {image_analysis_text or "無"}
 
     【檢索出的對話細節 (幫助你尋找具體答案)】：
     {retrieved_context}

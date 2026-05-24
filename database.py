@@ -17,6 +17,22 @@ def get_db_connection():
         print(f"❌ 資料庫連線失敗: {e}")
         return None
 
+def ensure_image_analysis_column(conn):
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            SELECT COUNT(*)
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'meetings'
+              AND COLUMN_NAME = 'image_analysis_text'
+        """)
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("ALTER TABLE meetings ADD COLUMN image_analysis_text LONGTEXT DEFAULT NULL AFTER transcript_text")
+            conn.commit()
+    finally:
+        cursor.close()
+
 def create_tables():
     conn = get_db_connection()
     if not conn:
@@ -55,6 +71,7 @@ def create_tables():
                 folder_id INT NOT NULL,
                 title VARCHAR(255) NOT NULL,
                 transcript_text LONGTEXT DEFAULT NULL,
+                image_analysis_text LONGTEXT DEFAULT NULL,
                 summary_text LONGTEXT DEFAULT NULL,
                 mindmap_data LONGTEXT DEFAULT NULL,
                 audio_file_path VARCHAR(500) DEFAULT NULL,
@@ -62,8 +79,9 @@ def create_tables():
                 FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
             )
         """)
-        
+
         conn.commit()
+        ensure_image_analysis_column(conn)
         print("✅ 資料庫與表格初始化成功！")
         
     except Error as e:

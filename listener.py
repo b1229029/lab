@@ -116,7 +116,7 @@ async def audio_handler(websocket):
                         await websocket.send(json.dumps({"type": "upload_progress", "message": "正在分析圖片內容..."}))
                         loop = asyncio.get_running_loop()
                         analysis_result = await loop.run_in_executor(None, analyze_image_content, base64_data, filename)
-                        await websocket.send(json.dumps({"type": "image_analysis_result", "description": analysis_result}))
+                        await websocket.send(json.dumps({"type": "image_analysis_result", "filename": filename, "description": analysis_result}))
 
                     elif msg_type == 'schedule_next':
                         try:
@@ -141,7 +141,11 @@ async def audio_handler(websocket):
                             "text": f"🖼️ 【圖片分析】 {img_filename} - {img_description}",
                             "ts": "[系統補充] ",
                             "hit_topics": [],
-                            "status": "NORMAL"
+                            "status": "NORMAL",
+                            "image_analysis": {
+                                "filename": img_filename,
+                                "description": img_description
+                            }
                         }))
                             
                     elif msg_type == 'start_file_upload':

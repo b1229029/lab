@@ -36,6 +36,7 @@
         /* 內容區塊細節 */
         #transcript-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.8; color: #444; background: #f9fff9; padding: 20px; border-left: 5px solid #28a745; border-radius: 4px; font-size: 15px; }
         #summary-content { flex: 1; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #333; font-size: 15px; }
+        #image-analysis-content { max-height: 220px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #333; background: #eef7ff; padding: 15px; border-left: 5px solid #17a2b8; border-radius: 4px; font-size: 14px; margin-bottom: 15px; }
         #mindmap-container { flex: 1; border: 1px solid #ddd; border-radius: 8px; background: #fff; overflow: hidden; }
         #markmap-svg { width: 100%; height: 100%; }
 
@@ -71,6 +72,10 @@
         <div id="page-summary" class="page-section">
             <div class="card">
                 <h3> AI 會議總結報告</h3>
+                <div id="image-analysis-section" style="display:none;">
+                    <h3>圖片分析結果</h3>
+                    <div id="image-analysis-content"></div>
+                </div>
                 <div id="summary-content">總結載入中...</div>
             </div>
         </div>
@@ -138,6 +143,10 @@
                 document.getElementById('navbar-title').innerText = ` ${data.title}`;
                 document.getElementById('transcript-content').innerText = data.transcript_text || "無資料";
                 document.getElementById('summary-content').innerText = data.summary_text || "無總結資料";
+                if (data.image_analysis_text) {
+                    document.getElementById('image-analysis-section').style.display = 'block';
+                    document.getElementById('image-analysis-content').innerText = data.image_analysis_text;
+                }
 
                 // 音檔播放器
                 if (data.audio_file_path) {

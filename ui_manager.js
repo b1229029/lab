@@ -1,7 +1,7 @@
 // ui_manager.js
 const UIManager = {
     myTopics: [], topicToTranscriptId: {},
-    fullTranscriptLog: [], chunkCounter: 0,
+    fullTranscriptLog: [], imageAnalysisLog: [], chunkCounter: 0,
     mindmapTimestamps: [], targetEndTime: null,
     pendingMindmapRoot: null, currentMode: 'mic',
     isAgendaLocked: false, meetingStartTime: null,
@@ -127,6 +127,9 @@ const UIManager = {
         p.innerHTML = `${tag} <strong>${ts}</strong> ${data.text}`; p.style.padding = '5px'; 
         this.els.liveTranscript.appendChild(p); this.els.liveTranscript.scrollTop = this.els.liveTranscript.scrollHeight;
         
+        if (data.image_analysis) {
+            this.addImageAnalysis(data.image_analysis.filename, data.image_analysis.description);
+        }
         this.fullTranscriptLog.push(`${ts} ${data.text}`);
         
         if (data.hit_topics && data.hit_topics.length > 0) {
@@ -142,11 +145,20 @@ const UIManager = {
     },
 
     updateImageAnalysis(data) {
+        this.addImageAnalysis(data.filename || '圖片', data.description || '');
         const p = document.createElement('p'); p.style.background = "#e3f2fd"; p.style.borderLeft = "4px solid #17a2b8";
         p.innerHTML = `<strong>[圖片分析]</strong> ${data.description}`;
         this.els.liveTranscript.appendChild(p); this.els.liveTranscript.scrollTop = this.els.liveTranscript.scrollHeight;
         this.els.btnUploadImage.disabled = false; this.els.btnUploadImage.textContent = "分析圖片"; 
         this.els.imgStatus.textContent = "✅ 分析完成"; this.els.imageInput.value = "";
+    },
+
+    addImageAnalysis(filename, description) {
+        if (!description) return;
+        const entry = `[圖片分析] ${filename || '圖片'}:\n${description}`;
+        if (!this.imageAnalysisLog.includes(entry)) {
+            this.imageAnalysisLog.push(entry);
+        }
     },
 
     updateInterimSummary(data) {
@@ -240,7 +252,7 @@ const UIManager = {
         this.els.aiSummaryBox.innerHTML = '<div style="text-align:center; margin-top:50px; color:#888;">生成中...</div>';
         this.els.markmapSvg.innerHTML = ''; this.els.nextAgendaPreview.value = ''; this.pendingMindmapRoot = null;
         this.els.liveTranscript.innerHTML = ""; this.els.fullTranscript.innerHTML = ""; 
-        this.chunkCounter = 0; this.fullTranscriptLog = []; this.topicToTranscriptId = {}; 
+        this.chunkCounter = 0; this.fullTranscriptLog = []; this.imageAnalysisLog = []; this.topicToTranscriptId = {}; 
         this.meetingStartTime = Date.now(); this.isAgendaLocked = true;
         this.els.actionButton.disabled = true; this.els.statusText.textContent = '狀態：初始化中...';
     }

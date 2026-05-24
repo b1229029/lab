@@ -21,5 +21,6 @@ class MeetingCreate(BaseModel):
 
 class MeetingUpdate(BaseModel):
     transcript_text: Optional[str] = None
+    image_analysis_text: Optional[str] = None
     summary_text: Optional[str] = None
     mindmap_data: Optional[str] = None

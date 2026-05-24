@@ -34,7 +34,16 @@ function setupWebSocket() {
                 UIManager.renderAgendaList(); 
             }
             if (data.type === 'transcript') UIManager.updateTranscript(data);
-            if (data.type === 'image_analysis_result') UIManager.updateImageAnalysis(data);
+            if (data.type === 'image_analysis_result') {
+                UIManager.updateImageAnalysis(data);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "append_image_result",
+                        filename: data.filename || "圖片",
+                        description: data.description || ""
+                    }));
+                }
+            }
             if (data.type === 'interim_summary_result') UIManager.updateInterimSummary(data.data);
             
             if (data.type === 'summary_result') {
@@ -155,7 +164,31 @@ function startFileUpload() {
     reader.readAsArrayBuffer(file.slice(0, chunkSize));
 }
 
-function requestSummary() { setTimeout(() => { ws.send(JSON.stringify({ type: "request_summary", template: UIManager.els.templateSelect.value })); }, 500); }
+function extractImageAnalysisFromTranscript(transcriptText) {
+    return transcriptText
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.includes('圖片分析'))
+        .filter((line, index, arr) => arr.indexOf(line) === index)
+        .join('\n');
+}
+
+function getImageAnalysisTextForSave() {
+    const fromLog = (UIManager.imageAnalysisLog || []).join('\n\n').trim();
+    const finalTranscript = UIManager.fullTranscriptLog.join('\n');
+    const fromTranscript = extractImageAnalysisFromTranscript(finalTranscript).trim();
+    return fromLog || fromTranscript;
+}
+
+function requestSummary() {
+    setTimeout(() => {
+        ws.send(JSON.stringify({
+            type: "request_summary",
+            template: UIManager.els.templateSelect.value,
+            image_analysis_text: getImageAnalysisTextForSave()
+        }));
+    }, 500);
+}
 
 // 5. 資料庫儲存
 async function saveMeetingDataToDB(summary, mindmap) {
@@ -170,6 +203,7 @@ async function saveMeetingDataToDB(summary, mindmap) {
 
     try {
         const finalTranscript = UIManager.fullTranscriptLog.join('\n');
+        const imageAnalysisText = getImageAnalysisTextForSave();
         
         await fetch(`${API_BASE_URL}/meetings/${currentMeetingId}`, {
             method: 'PUT',
@@ -177,7 +211,8 @@ async function saveMeetingDataToDB(summary, mindmap) {
             body: JSON.stringify({ 
                 summary_text: summary, 
                 mindmap_data: mindmap, 
-                transcript_text: finalTranscript 
+                transcript_text: finalTranscript,
+                image_analysis_text: imageAnalysisText
             })
         });
 

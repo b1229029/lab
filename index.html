@@ -235,8 +235,8 @@
     </script>
 
     <script src="audio_manager.js"></script>
-    <script src="ui_manager.js"></script>
-    <script src="record.js?v=2025"></script>
+    <script src="ui_manager.js?v=2026-05-24-image-analysis"></script>
+    <script src="record.js?v=2026-05-24-image-analysis"></script>
 
     <script>
         const imageInput = document.getElementById('image-input');
@@ -285,6 +285,9 @@
 
                 if (response.ok && data.status === "success") {
                     // 不再直接修改 innerHTML，而是改用 WebSocket 把結果傳給後端變數
+                    if (typeof UIManager !== 'undefined' && typeof UIManager.addImageAnalysis === 'function') {
+                        UIManager.addImageAnalysis(data.filename, data.description);
+                    }
                     if (window.ws && window.ws.readyState === WebSocket.OPEN) {
                         window.ws.send(JSON.stringify({
                             type: 'append_image_result',

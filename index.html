@@ -56,6 +56,8 @@
         #live-transcript { border-left: 5px solid #007bff; flex: 1; }
         #full-transcript { border-left: 5px solid #28a745; flex: 1; background: #f9fff9; line-height: 1.8; color: #333; }
         #full-transcript p { margin: 8px 0; border-bottom: 1px dashed #eee; padding-bottom: 5px; }
+        #image-analysis-result-section { display: none; flex-shrink: 0; margin-bottom: 12px; }
+        #image-analysis-result-box { max-height: 220px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; color: #333; background: #eef7ff; padding: 15px; border-left: 5px solid #17a2b8; border-radius: 4px; font-size: 14px; }
 
         .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; color: white; margin-right: 5px; }
         .tag-consensus { background-color: #28a745; }
@@ -193,6 +195,10 @@
                         <button id="copyBtn" class="btn-info" disabled> 複製</button>
                     </div>
                 </div>
+                <div id="image-analysis-result-section">
+                    <h3>圖片分析結果</h3>
+                    <div id="image-analysis-result-box"></div>
+                </div>
                 <div id="ai-summary-box" style="flex: 1; background: #f8f9fa; padding: 20px; border-radius: 4px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6;">
                     <div style="text-align: center; color: #888; margin-top: 50px;">
                         <p>會議尚未結束或未生成報告</p>
@@ -235,8 +241,8 @@
     </script>
 
     <script src="audio_manager.js"></script>
-    <script src="ui_manager.js?v=2026-05-24-image-analysis"></script>
-    <script src="record.js?v=2026-05-24-image-analysis"></script>
+    <script src="ui_manager.js?v=2026-05-24-image-result"></script>
+    <script src="record.js?v=2026-05-24-image-result"></script>
 
     <script>
         const imageInput = document.getElementById('image-input');

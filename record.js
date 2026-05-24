@@ -174,6 +174,10 @@ function extractImageAnalysisFromTranscript(transcriptText) {
 }
 
 function getImageAnalysisTextForSave() {
+    if (typeof UIManager.getImageAnalysisText === 'function') {
+        return UIManager.getImageAnalysisText();
+    }
+
     const fromLog = (UIManager.imageAnalysisLog || []).join('\n\n').trim();
     const finalTranscript = UIManager.fullTranscriptLog.join('\n');
     const fromTranscript = extractImageAnalysisFromTranscript(finalTranscript).trim();

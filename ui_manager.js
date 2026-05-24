@@ -13,6 +13,7 @@ const UIManager = {
         const ids = ['actionButton', 'statusText', 'live-transcript', 'full-transcript', 'agenda-list', 'warning-msg', 
                      'new-topic-input', 'add-topic-btn', 'input-area', 'file-upload-area', 'audio-file-input', 
                      'ai-summary-box', 'template-select', 'markmap-svg', 'downloadBtn', 'copyBtn', 
+                     'image-analysis-result-section', 'image-analysis-result-box',
                      'next-agenda-preview', 'next-meeting-time', 'next-emails', 'btn-schedule-next', 
                      'cal-status', 'btn-upload-image', 'image-input', 'img-status', 'interim-summary-box', 'mindmap-audio-player'];
                      
@@ -161,6 +162,32 @@ const UIManager = {
         }
     },
 
+    getImageAnalysisText() {
+        const fromLog = (this.imageAnalysisLog || []).join('\n\n').trim();
+        if (fromLog) return fromLog;
+
+        return (this.fullTranscriptLog || [])
+            .map(line => String(line).trim())
+            .filter(line => line.includes('圖片分析'))
+            .filter((line, index, arr) => arr.indexOf(line) === index)
+            .join('\n');
+    },
+
+    renderImageAnalysisResult() {
+        if (!this.els.imageAnalysisResultSection || !this.els.imageAnalysisResultBox) return "";
+
+        const imageAnalysisText = this.getImageAnalysisText();
+        if (imageAnalysisText) {
+            this.els.imageAnalysisResultSection.style.display = 'block';
+            this.els.imageAnalysisResultBox.textContent = imageAnalysisText;
+        } else {
+            this.els.imageAnalysisResultSection.style.display = 'none';
+            this.els.imageAnalysisResultBox.textContent = '';
+        }
+
+        return imageAnalysisText;
+    },
+
     updateInterimSummary(data) {
         if(!this.els.interimSummaryBox) return;
         const now = new Date(); const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -170,8 +197,13 @@ const UIManager = {
     },
 
     renderSummaryAndMindmap(res, audioSourceUrl) {
+        const imageAnalysisText = this.renderImageAnalysisResult();
+
         if (res && res.summary) {
             this.els.aiSummaryBox.innerHTML = res.summary; this.currentSummaryData = res.summary;
+            if (imageAnalysisText) {
+                this.currentSummaryData = `${res.summary}\n\n## 圖片分析結果\n${imageAnalysisText}`;
+            }
             const clean = res.summary.replace(/<[^>]+>/g, '');
             if (clean.includes("二、尚未解決議題")) {
                 const parts = clean.split("二、尚未解決議題");
@@ -250,6 +282,8 @@ const UIManager = {
     resetMeetingUI() {
         this.els.inputArea.style.display = 'none';
         this.els.aiSummaryBox.innerHTML = '<div style="text-align:center; margin-top:50px; color:#888;">生成中...</div>';
+        if (this.els.imageAnalysisResultSection) this.els.imageAnalysisResultSection.style.display = 'none';
+        if (this.els.imageAnalysisResultBox) this.els.imageAnalysisResultBox.textContent = '';
         this.els.markmapSvg.innerHTML = ''; this.els.nextAgendaPreview.value = ''; this.pendingMindmapRoot = null;
         this.els.liveTranscript.innerHTML = ""; this.els.fullTranscript.innerHTML = ""; 
         this.chunkCounter = 0; this.fullTranscriptLog = []; this.imageAnalysisLog = []; this.topicToTranscriptId = {}; 

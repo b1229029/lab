@@ -1,3 +1,10 @@
+"""AI 模型呼叫與摘要產生服務。
+
+本檔集中管理 OpenAI-compatible chat/vision API 的請求格式。listener.py 會
+呼叫這些函式來完成圖片分析、短摘要、會議總結、心智圖文字與即時摘要。
+所有函式都回傳純文字或 JSON 字串，方便 WebSocket 層直接傳回前端。
+"""
+
 import time
 import requests
 import json
@@ -18,6 +25,12 @@ CHAT_ENDPOINT = f"{BASE_URL}/chat/completions"
 # 圖片分析功能
 # ==========================================
 def analyze_image_content(base64_image, filename="unknown.jpg"):
+    """分析 base64 圖片並回傳文字描述。
+
+    base64_image 可是純 base64，也可是 data:image/... URL。函式會補齊
+    data URL 前綴後呼叫 vision model，讓會議中的截圖、白板或投影片可以
+    轉成後續摘要與問答能使用的文字。
+    """
     USE_MOCK_VISION = False 
     if USE_MOCK_VISION:
         time.sleep(1.5)
@@ -55,6 +68,11 @@ def analyze_image_content(base64_image, filename="unknown.jpg"):
 # 長文本分段總結
 # ==========================================
 def summarize_chunk(chunk_text):
+    """將一段逐字稿壓縮成短摘要。
+
+    主要用於長會議中間摘要或分段整理，讓後續生成總摘要時不必把所有原文
+    一次塞進模型。
+    """
     prompt = f"請幫我用 50 到 100 字以內的繁體中文，總結以下對話內容的重點。\n若這段內容無實質重點，請回覆：「無明顯重點」。\n【對話片段】\n{chunk_text}"
     headers = {
         "Content-Type": "application/json", 
@@ -78,6 +96,12 @@ def summarize_chunk(chunk_text):
 # 生成最終會議紀錄與心智圖
 # ==========================================
 def generate_meeting_summary(compiled_context, undiscussed_list=None, template_type="general", retry_count=0, participants_str=""):
+    """依會議上下文產生摘要與心智圖 Markdown。
+
+    compiled_context 會包含逐字稿、即時摘要與圖片分析結果；undiscussed_list
+    會提醒模型哪些議程尚未被討論。函式回傳 JSON 字串，格式包含 summary
+    與 mindmap，前端會分別渲染到摘要頁與 markmap 心智圖。
+    """
     if not compiled_context or len(compiled_context) < 10: 
         return json.dumps({"summary": "會議內容過短，無法生成總結。", "mindmap": ""})
 
@@ -189,6 +213,11 @@ def generate_meeting_summary(compiled_context, undiscussed_list=None, template_t
 # 每分鐘即時重點 (Interim Summary)
 # ==========================================
 def generate_interim_summary(recent_transcript):
+    """替最近新增的逐字稿產生即時短摘要。
+
+    前端錄音時會定期要求 interim summary，讓使用者不用等到會議結束才看見
+    AI 整理結果。內容太短時直接回傳提示文字，避免浪費 API 請求。
+    """
     if len(recent_transcript) < 30:
         return "目前內容過少，暫無重點。"
     

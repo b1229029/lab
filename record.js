@@ -1,4 +1,12 @@
-// record.js
+/**
+ * record.js
+ *
+ * 會議錄製頁面的主控制器。這個檔案負責串接：
+ * - UIManager：畫面狀態與渲染。
+ * - AudioManager：瀏覽器錄音與音訊切片。
+ * - WebSocket listener.py：即時轉錄、圖片分析、摘要與行事曆事件。
+ * - FastAPI REST API：儲存會議結果與完整音訊。
+ */
 const API_BASE_URL = "http://127.0.0.1:8000"; 
 const urlParams = new URLSearchParams(window.location.search);
 const currentMeetingId = urlParams.get('meeting_id');
@@ -12,6 +20,7 @@ UIManager.init(currentMeetingTopic);
 
 // 2. 建立 WebSocket 連線與訊息處理
 function setupWebSocket() {
+    // 建立與 listener.py 的 WebSocket 連線，後續所有即時轉錄與摘要都走這條通道。
     let host = window.location.hostname; if (!host || host === "") host = "192.168.150.5";
     ws = new WebSocket(`ws://${host}:8765`);
 
@@ -24,6 +33,7 @@ function setupWebSocket() {
     };
 
     ws.onmessage = (event) => {
+        // 後端所有控制訊息都是 JSON；音訊二進位只由前端送出，不會在這裡處理。
         try {
             const data = JSON.parse(event.data);
 
@@ -75,6 +85,7 @@ function setupWebSocket() {
 
 // 3. 綁定按鈕事件
 UIManager.els.actionButton.onclick = async () => {
+    // actionButton 在不同階段有不同語意：開始會議、停止錄音、查看摘要。
     if(UIManager.els.actionButton.classList.contains('btn-success')) { UIManager.switchPage('summary'); return; }
     
     if (!UIManager.isAgendaLocked) {
@@ -102,6 +113,7 @@ UIManager.els.actionButton.onclick = async () => {
 
 // 圖片分析上傳按鈕綁定
 UIManager.els.btnUploadImage.onclick = () => {
+    // 使用 FileReader 先讓前端立即預覽圖片，再把 base64 送到 WebSocket 分析。
     const file = UIManager.els.imageInput.files[0];
     if (!file) return;
     UIManager.els.btnUploadImage.disabled = true; UIManager.els.btnUploadImage.textContent = "分析中..."; UIManager.els.imgStatus.textContent = "正在傳送...";
@@ -119,6 +131,7 @@ UIManager.els.btnUploadImage.onclick = () => {
 };
 
 UIManager.els.btnScheduleNext.onclick = () => {
+    // 將下次會議時間、email 與 AI 建議議程送到後端建立 Google Calendar 事件。
     const datetime = UIManager.els.nextMeetingTime.value; 
     if (!datetime) { alert("請選擇時間！"); return; }
     const emails = UIManager.els.nextEmails.value.split(',').map(e => e.trim()).filter(e => e);
@@ -128,6 +141,7 @@ UIManager.els.btnScheduleNext.onclick = () => {
 
 // 4. 錄音與上傳邏輯
 async function startActualRecording() {
+    // 啟動麥克風模式：錄音切片送 WebSocket，完整音訊留待會議結束上傳。
     try {
         await AudioManager.start(
             (chunkBlob) => { if (ws && ws.readyState === WebSocket.OPEN && chunkBlob.size > 0) ws.send(chunkBlob); },
@@ -142,12 +156,14 @@ async function startActualRecording() {
 }
 
 function stopRecording() {
+    // 停止麥克風模式，並在 AudioManager 完成最後片段後要求總摘要。
     UIManager.els.actionButton.innerHTML = '分析中...'; UIManager.els.actionButton.disabled = true; UIManager.els.statusText.textContent = '狀態：正在呼叫 AI 進行分析...';
     if (interimSummaryTimer) { clearInterval(interimSummaryTimer); interimSummaryTimer = null; }
     AudioManager.stop();
 }
 
 function startFileUpload() {
+    // 啟動檔案模式：將大檔切成 1MB ArrayBuffer 分批送到 WebSocket。
     const file = UIManager.els.audioFileInput.files[0]; if (!file) return;
     UIManager.els.statusText.textContent = '狀態：上傳檔案中...'; UIManager.els.actionButton.textContent = '上傳分析中...'; UIManager.els.actionButton.disabled = true;
     ws.send(JSON.stringify({ type: "start_file_upload", filename: file.name }));
@@ -165,6 +181,7 @@ function startFileUpload() {
 }
 
 function extractImageAnalysisFromTranscript(transcriptText) {
+    // 從舊版逐字稿標籤回收圖片分析文字，保留向後相容。
     return transcriptText
         .split('\n')
         .map(line => line.trim())
@@ -174,6 +191,7 @@ function extractImageAnalysisFromTranscript(transcriptText) {
 }
 
 function getImageAnalysisTextForSave() {
+    // 取得本次會議要寫進資料庫的圖片分析文字。
     if (typeof UIManager.getImageAnalysisText === 'function') {
         return UIManager.getImageAnalysisText();
     }
@@ -185,6 +203,7 @@ function getImageAnalysisTextForSave() {
 }
 
 function requestSummary() {
+    // 要求後端把目前累積的逐字稿、圖片分析與議程狀態整理成總摘要。
     setTimeout(() => {
         ws.send(JSON.stringify({
             type: "request_summary",
@@ -196,6 +215,7 @@ function requestSummary() {
 
 // 5. 資料庫儲存
 async function saveMeetingDataToDB(summary, mindmap) {
+    // 將摘要、心智圖、逐字稿、圖片分析與完整音訊保存到後端資料庫。
     if (!currentMeetingId) return;
 
     UIManager.els.actionButton.textContent = "資料庫存檔中，請勿關閉網頁...";
@@ -259,6 +279,7 @@ const chatInput = document.getElementById('chat-input');
 
 if (sendChatBtn && chatInput) {
     const handleSendChat = async () => {
+        // RAG 問答只在有 meeting_id 的會議中啟用，問題會送到 /meetings/{id}/chat。
         const historyEl = document.getElementById('chat-history');
         const question = chatInput.value.trim();
 

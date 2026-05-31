@@ -1,10 +1,16 @@
 <!DOCTYPE html>
+<!--
+    login.html
+    帳號登入與註冊頁。此頁直接呼叫 FastAPI 的 /login 與 /register，
+    成功登入後把後端回傳的使用者基本資料存入 localStorage，供 dashboard/index 使用。
+-->
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Whisper 會議助手 - 登入</title>
     <style>
+        /* 置中的簡易認證卡片，login-box 與 register-box 透過 hidden class 切換。 */
         body {
             font-family: "Microsoft JhengHei", sans-serif;
             background-color: #f4f6f9;
@@ -121,9 +127,11 @@
 </div>
 
 <script>
+    // 後端 REST API 根路徑；本專題預設 FastAPI 跑在 localhost:8000。
     const API_BASE_URL = "http://127.0.0.1:8000";
 
     function toggleView(view) {
+        // 切換登入/註冊表單時順便清掉上一個表單的提示訊息。
         document.getElementById('login-message').innerText = "";
         document.getElementById('register-message').innerText = "";
         if (view === 'register') {
@@ -136,6 +144,7 @@
     }
 
     async function register() {
+        // 收集註冊欄位，檢查必填後送到後端建立帳號。
         const username = document.getElementById('reg-username').value;
         const email = document.getElementById('reg-email').value;
         const password = document.getElementById('reg-password').value;
@@ -174,6 +183,7 @@
     }
 
     async function login() {
+        // 登入成功後把使用者資料存進 localStorage，讓其他頁面可判斷登入狀態。
         const email = document.getElementById('login-email').value;
         const password = document.getElementById('login-password').value;
         const msgBox = document.getElementById('login-message');

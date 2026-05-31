@@ -1,7 +1,15 @@
+"""MySQL 連線與資料表初始化工具。
+
+後端所有 router 都透過本檔取得資料庫連線，並在服務啟動時建立 users、
+folders、meetings 三張核心資料表。這裡也保留向後相容的欄位補齊邏輯，
+讓舊資料庫升級後仍能儲存圖片分析文字。
+"""
+
 import mysql.connector
 from mysql.connector import Error
 
 DB_CONFIG = {
+    # 本機開發用連線設定；正式部署時建議改由環境變數或密鑰管理服務提供。
     'host': 'localhost',
     'user': 'root',
     'password': '',
@@ -9,6 +17,11 @@ DB_CONFIG = {
 }
 
 def get_db_connection():
+    """建立並回傳一個 MySQL 連線。
+
+    回傳值可能是有效連線，也可能在連線失敗時為 None；呼叫端需要在使用
+    cursor 前確認連線存在，避免資料庫未啟動時造成未處理例外。
+    """
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         if conn.is_connected():
@@ -18,6 +31,11 @@ def get_db_connection():
         return None
 
 def ensure_image_analysis_column(conn):
+    """確認 meetings 資料表存在 image_analysis_text 欄位。
+
+    這個欄位是後續加入的功能，用來保存圖片辨識結果。若使用者已經有舊版
+    資料庫，本函式會自動 ALTER TABLE 補欄位，避免手動 migration。
+    """
     cursor = conn.cursor()
     try:
         cursor.execute("""
@@ -34,6 +52,12 @@ def ensure_image_analysis_column(conn):
         cursor.close()
 
 def create_tables():
+    """建立專案需要的基本資料表並補齊新版欄位。
+
+    users 保存帳號資料，folders 保存使用者的會議資料夾，meetings 保存
+    單場會議的逐字稿、摘要、心智圖與音訊檔路徑。外鍵皆使用 cascade delete，
+    讓刪除使用者或資料夾時可同步清掉下層資料。
+    """
     conn = get_db_connection()
     if not conn:
         return

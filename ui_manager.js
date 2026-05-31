@@ -1,13 +1,24 @@
-// ui_manager.js
+/**
+ * ui_manager.js
+ *
+ * 前端畫面狀態管理器。所有與 DOM 更新、頁面切換、逐字稿顯示、摘要渲染、
+ * 圖片分析紀錄與 markmap 心智圖互動有關的工作都集中在這裡。
+ *
+ * record.js 負責資料流與後端溝通；UIManager 負責把資料轉成使用者看得懂的畫面。
+ */
 const UIManager = {
+    // myTopics 是使用者設定的議程；topicToTranscriptId 用來讓已命中的議程可跳到逐字稿位置。
     myTopics: [], topicToTranscriptId: {},
+    // fullTranscriptLog 保存完整逐字稿；imageAnalysisLog 保存獨立圖片分析文字。
     fullTranscriptLog: [], imageAnalysisLog: [], chunkCounter: 0,
+    // mindmapTimestamps 與 targetEndTime 用於點擊心智圖節點後播放對應音訊片段。
     mindmapTimestamps: [], targetEndTime: null,
     pendingMindmapRoot: null, currentMode: 'mic',
     isAgendaLocked: false, meetingStartTime: null,
     currentSummaryData: "", els: {},
 
     init(initialTopic) {
+        // 從 dashboard 建立會議時會把會議標題帶進 query string，這裡先加入議程。
         if (initialTopic) this.myTopics.push(initialTopic);
 
         const ids = ['actionButton', 'statusText', 'live-transcript', 'full-transcript', 'agenda-list', 'warning-msg', 
@@ -28,6 +39,7 @@ const UIManager = {
     },
 
     bindEvents() {
+        // 綁定所有純 UI 事件；需要和後端互動的事件由 record.js 接手。
         if (this.els.imageInput) {
             this.els.imageInput.onchange = () => {
                 if (this.els.imageInput.files.length > 0) {
@@ -60,6 +72,7 @@ const UIManager = {
     },
 
     switchPage(pageName) {
+        // 單頁式介面以 class active 控制目前顯示的頁面與導覽按鈕。
         document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
         const targetPage = document.getElementById(`page-${pageName}`);
@@ -87,6 +100,7 @@ const UIManager = {
     },
 
     toggleMode() {
+        // 根據 radio 選擇切換麥克風錄音或檔案上傳模式。
         const radios = document.getElementsByName('mode');
         for (let r of radios) if (r.checked) this.currentMode = r.value;
         if (this.currentMode === 'mic') { 
@@ -99,6 +113,7 @@ const UIManager = {
     },
 
     renderAgendaList() {
+        // 重新繪製議程清單；若議程已被逐字稿命中，使用刪除線並可點擊跳轉。
         this.els.agendaList.innerHTML = '';
         if (this.myTopics.length === 0) { this.els.agendaList.innerHTML = '<p style="text-align:center; color:#ccc; font-size:0.9em;">無議程</p>'; return; }
         this.myTopics.forEach((topic, index) => {
@@ -118,6 +133,7 @@ const UIManager = {
     },
 
     updateTranscript(data) {
+        // 接收後端辨識結果後，同步更新即時逐字稿、完整逐字稿與議程命中狀態。
         const ts = data.ts ? data.ts.trim() : `[片段]`;
         const p = document.createElement('p'); p.id = `transcript-${this.chunkCounter}`; 
         
@@ -146,6 +162,7 @@ const UIManager = {
     },
 
     updateImageAnalysis(data) {
+        // 圖片分析結果同時顯示在即時紀錄，也寫入 imageAnalysisLog 供摘要與儲存使用。
         this.addImageAnalysis(data.filename || '圖片', data.description || '');
         const p = document.createElement('p'); p.style.background = "#e3f2fd"; p.style.borderLeft = "4px solid #17a2b8";
         p.innerHTML = `<strong>[圖片分析]</strong> ${data.description}`;
@@ -155,6 +172,7 @@ const UIManager = {
     },
 
     addImageAnalysis(filename, description) {
+        // 用完整 entry 去重，避免同一張圖片透過 HTTP 與 WebSocket 流程被加入兩次。
         if (!description) return;
         const entry = `[圖片分析] ${filename || '圖片'}:\n${description}`;
         if (!this.imageAnalysisLog.includes(entry)) {
@@ -163,6 +181,7 @@ const UIManager = {
     },
 
     getImageAnalysisText() {
+        // 優先使用獨立圖片分析紀錄；若沒有，再從舊版逐字稿標籤中回推。
         const fromLog = (this.imageAnalysisLog || []).join('\n\n').trim();
         if (fromLog) return fromLog;
 
@@ -174,6 +193,7 @@ const UIManager = {
     },
 
     renderImageAnalysisResult() {
+        // 摘要頁的圖片分析區塊只有在有內容時顯示，避免空白區域干擾閱讀。
         if (!this.els.imageAnalysisResultSection || !this.els.imageAnalysisResultBox) return "";
 
         const imageAnalysisText = this.getImageAnalysisText();
@@ -189,6 +209,7 @@ const UIManager = {
     },
 
     updateInterimSummary(data) {
+        // 即時摘要採最新在上的方式追加，方便使用者看到最近一段會議重點。
         if(!this.els.interimSummaryBox) return;
         const now = new Date(); const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
         const newEntry = `<div style="margin-bottom: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 5px;"><strong>[${timeStr} 更新]</strong><br>${data.replace(/\n/g, '<br>')}</div>`;
@@ -197,6 +218,7 @@ const UIManager = {
     },
 
     renderSummaryAndMindmap(res, audioSourceUrl) {
+        // 總結完成後一次更新摘要、圖片分析、下一次議程草稿、心智圖與音訊播放控制。
         const imageAnalysisText = this.renderImageAnalysisResult();
 
         if (res && res.summary) {
@@ -262,6 +284,7 @@ const UIManager = {
     },
 
     handleMindmapClick(e) {
+        // 點擊 markmap 節點時若文字內含 [MM:SS]，就跳到對應音訊時間播放。
         const nodeGroup = e.target.closest('.markmap-node');
         if (nodeGroup && window.d3) {
             const datum = window.d3.select(nodeGroup).datum();
@@ -280,6 +303,7 @@ const UIManager = {
     },
 
     resetMeetingUI() {
+        // 會議開始前清掉上一輪狀態，並鎖定議程輸入，確保逐字稿命中結果穩定。
         this.els.inputArea.style.display = 'none';
         this.els.aiSummaryBox.innerHTML = '<div style="text-align:center; margin-top:50px; color:#888;">生成中...</div>';
         if (this.els.imageAnalysisResultSection) this.els.imageAnalysisResultSection.style.display = 'none';

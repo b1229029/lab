@@ -1,3 +1,9 @@
+"""圖片分析 API。
+
+前端可上傳會議截圖、白板或投影片圖片，本 router 會把圖片轉成 base64
+data URL 並交給支援 vision 的 OpenAI-compatible API 產生文字描述。
+"""
+
 from fastapi import APIRouter, File, UploadFile, HTTPException
 import base64
 from openai import OpenAI
@@ -18,6 +24,11 @@ client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
 @router.post("/analyze")
 async def analyze_image(file: UploadFile = File(...)):
+    """分析單張圖片並回傳模型描述。
+
+    只接受 image/* MIME type，避免把非圖片檔送到 vision 模型。回傳的
+    description 會被前端加入會議紀錄，後續摘要與 RAG 問答都能使用。
+    """
     # 1. 檢查檔案格式是否為圖片
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="請上傳圖片檔案")

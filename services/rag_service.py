@@ -1,3 +1,10 @@
+"""會議內容 RAG 問答服務。
+
+此服務把使用者問題、會議逐字稿、摘要與圖片分析文字組成檢索式提示。
+當逐字稿很長時，會先用 embedding 找出與問題最相關的片段，再把片段交給
+聊天模型回答，降低 token 成本並提高回答聚焦度。
+"""
+
 import torch
 import requests
 import json
@@ -6,6 +13,17 @@ from services.audio_service import embedding_model  # 重用 bge-m3 模型
 from services.ai_service import CHAT_ENDPOINT, NEW_API_KEY, CHAT_MODEL
 
 def chat_with_meeting_rag(question: str, full_transcript: str, summary_text: str, image_analysis_text: str = ""):
+    """根據單場會議內容回答問題。
+
+    Args:
+        question: 使用者在聊天框提出的問題。
+        full_transcript: 完整逐字稿。
+        summary_text: 已產生的會議摘要，可作為高階背景。
+        image_analysis_text: 圖片/白板/投影片分析結果，會一併納入可檢索內容。
+
+    Returns:
+        模型回答文字；若 API 呼叫失敗則回傳可顯示給前端的錯誤訊息。
+    """
     image_section = ""
     if image_analysis_text:
         image_section = f"\n\n【圖片分析結果】\n{image_analysis_text}"

@@ -1,3 +1,9 @@
+"""資料夾管理 API。
+
+資料夾是 dashboard.html 的第一層組織單位，用來把不同主題或課程的會議
+分開管理。刪除資料夾時也會清掉該資料夾底下會議的音訊檔案。
+"""
+
 from fastapi import APIRouter, HTTPException
 import mysql.connector
 import os
@@ -8,6 +14,7 @@ router = APIRouter(tags=["資料夾管理"])
 
 @router.post("/folders")
 def create_folder(request: FolderCreate):
+    """替指定使用者建立一個新的會議資料夾。"""
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -22,6 +29,7 @@ def create_folder(request: FolderCreate):
 
 @router.get("/folders/{user_id}")
 def get_user_folders(user_id: int):
+    """依使用者 id 取得資料夾清單，最新建立的資料夾排在前面。"""
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -35,6 +43,11 @@ def get_user_folders(user_id: int):
 
 @router.delete("/folders/{folder_id}")
 def delete_folder(folder_id: int):
+    """刪除資料夾與其下所有會議資料。
+
+    資料庫會透過外鍵 cascade 刪除 meetings；這裡額外先刪除音訊實體檔，
+    避免 uploads 目錄累積孤兒檔案。
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:

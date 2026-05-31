@@ -1,4 +1,10 @@
 <!DOCTYPE html>
+<!--
+    index.html
+    會議錄製與即時 AI 助理主頁。此頁負責讓使用者設定議程、選擇麥克風或檔案模式、
+    上傳圖片、查看即時逐字稿、取得 AI 摘要、瀏覽心智圖並與會議內容聊天。
+    主要互動邏輯分別由 audio_manager.js、ui_manager.js、record.js 控制。
+-->
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -9,6 +15,7 @@
     <script src="https://fastly.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.min.js"></script>
 
     <style>
+        /* 全頁採單頁式應用布局：上方 navbar 固定，下面的 page-section 依狀態切換。 */
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; height: 100vh; display: flex; flex-direction: column; }
         
         /* 導航列 */
@@ -77,6 +84,7 @@
     </style>
 
     <script>
+        // 進入會議頁前先檢查登入狀態；未登入直接導回 login.html。
         const userJson = localStorage.getItem("whisper_user");
         if (!userJson) {
             window.location.replace("login.html");
@@ -92,6 +100,7 @@
 </head>
 <body>
 
+    <!-- 導覽列控制四個主要頁籤：錄製、摘要、心智圖、會議問答。 -->
     <div class="navbar">
         <h2> 「咪挺」– 你的會議紀錄助手 </h2>
         <button class="nav-btn active" onclick="switchPage('home')">1. 會議進行</button>
@@ -108,6 +117,7 @@
     </div>
 
     <div class="container">
+        <!-- page-home 是會議進行中的工作區，左側顯示逐字稿，右側管理議程與下次會議。 -->
         <div id="page-home" class="page-section active">
             <div class="main-col">
                 <div class="card control-panel">
@@ -187,6 +197,7 @@
         </div>
 
         <div id="page-summary" class="page-section">
+            <!-- AI 摘要頁：顯示總結、圖片分析結果，並提供下載與複製 Markdown。 -->
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3> AI 會議總結報告</h3>
@@ -209,6 +220,7 @@
         </div>
 
         <div id="page-mindmap" class="page-section">
+            <!-- 心智圖頁：markmap 會把 AI 產生的 Markdown 轉成可點擊節點。 -->
             <div class="card" style="height: 100%; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h3> 結構化心智圖</h3>
@@ -221,6 +233,7 @@
         </div>
 
         <div id="page-chat" class="page-section">
+            <!-- 會議問答頁：使用已保存/本次會議內容作為 RAG 背景回答問題。 -->
             <div class="card" style="height: 100%; display: flex; flex-direction: column; border: 2px solid #007bff;">
                 <h3>💬 會議問答機器人</h3>
                 <div id="chat-history" style="flex: 1; overflow-y: auto; background: #f4f6f9; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -235,6 +248,7 @@
     </div>
     
     <script>
+        // 把登入使用者名稱顯示在右上角，並提供返回 dashboard 的入口。
         if(window.currentUser) {
             document.getElementById('welcome-msg').innerText = " 歡迎, " + window.currentUser.username + " (點此返回列表)";
         }
@@ -245,6 +259,8 @@
     <script src="record.js?v=2026-05-24-image-result"></script>
 
     <script>
+        // 這段處理圖片上傳的 REST API 流程；record.js 另有 WebSocket 圖片流程，
+        // 因此這裡會先清掉舊 onclick，再用 addEventListener 綁定新版流程。
         const imageInput = document.getElementById('image-input');
         const imgStatus = document.getElementById('img-status');
         const btnUploadImage = document.getElementById('btn-upload-image');

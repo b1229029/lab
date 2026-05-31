@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+    view.html
+    歷史會議檢視頁。此頁從 meeting_id query string 讀取已保存會議，
+    顯示逐字稿、摘要、圖片分析、心智圖、音訊播放與 RAG 問答。
+-->
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -8,6 +13,7 @@
     <script src="https://fastly.jsdelivr.net/npm/markmap-view@0.15.4/dist/browser/index.min.js"></script>
 
     <style>
+        /* 與 index.html 保持相近的頁籤布局，但此頁以閱讀歷史資料為主。 */
         body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; height: 100vh; display: flex; flex-direction: column; }
         
         /* 1. 導航列樣式 - 參考 index.html */
@@ -107,6 +113,7 @@
     </div>
 
     <script>
+        // 讀取會議資料所需的 API 根路徑與 URL 參數。
         const API_BASE_URL = "http://127.0.0.1:8000"; 
         const urlParams = new URLSearchParams(window.location.search);
         const meetingId = urlParams.get('meeting_id');
@@ -117,6 +124,7 @@
 
         // --- 分頁切換邏輯 ---
         function switchPage(pageName) {
+            // 切換逐字稿、摘要、心智圖與聊天頁籤；心智圖頁顯示時重新 fit。
             document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
             
@@ -134,6 +142,7 @@
 
         // --- 載入資料庫資料 ---
         async function loadMeetingData() {
+            // 依 meeting_id 載入會議完整資料，並初始化音訊播放器與 markmap。
             if (!meetingId) { alert("無效的會議 ID"); window.location.href = "dashboard.html"; return; }
             
             try {
@@ -191,6 +200,7 @@
 
         // --- 心智圖跳轉功能 ---
         document.getElementById('markmap-svg').onclick = (e) => {
+            // 點擊含 [MM:SS] 的心智圖節點時，讓音訊跳到該段落附近播放。
             const nodeGroup = e.target.closest('.markmap-node');
             if (nodeGroup && window.d3) {
                 const datum = window.d3.select(nodeGroup).datum();
@@ -211,6 +221,7 @@
         const chatInput = document.getElementById('chat-input');
         
         async function handleSend() {
+            // 將使用者問題送到後端 RAG 端點，並把回答追加到聊天紀錄。
             const question = chatInput.value.trim();
             if (!question) return;
             

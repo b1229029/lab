@@ -1,9 +1,15 @@
 <!DOCTYPE html>
+<!--
+    dashboard.html
+    使用者登入後的資料夾與會議管理頁。此頁會呼叫 FastAPI 的 folders/meetings
+    REST API，讓使用者建立資料夾、建立會議、進入錄製頁、查看歷史會議或刪除資料。
+-->
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <title>會員專區 - 專案資料夾</title>
     <style>
+        /* Dashboard 使用左右雙欄：左欄是資料夾，右欄是選定資料夾內的會議清單。 */
         body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; background: #343a40; color: white; padding: 15px 30px; border-radius: 8px; margin-bottom: 20px; }
         .btn-logout { background: transparent; border: 1px solid #dc3545; color: #dc3545; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -83,6 +89,7 @@
 </div>
 
 <script>
+    // 後端 API 位置與登入使用者資料；未登入時應回 login.html。
     const API_BASE_URL = "http://127.0.0.1:8000";
     const userJson = localStorage.getItem("whisper_user");
     if (!userJson) window.location.replace("login.html");
@@ -121,11 +128,13 @@
     }
 
     function logout() {
+        // 登出只需要清掉 localStorage 中的使用者資料，後端目前沒有 session/token。
         localStorage.removeItem("whisper_user");
         window.location.replace("login.html");
     }
 
     async function loadFolders() {
+        // 載入目前使用者的所有資料夾，並為每個資料夾建立選取與刪除操作。
         const res = await fetch(`${API_BASE_URL}/folders/${currentUser.id}`);
         const data = await res.json();
         const listEl = document.getElementById('folder-list');
@@ -154,6 +163,7 @@
     }
 
     async function createFolder() {
+        // 建立新資料夾後重新載入左側清單。
         const name = document.getElementById('new-folder-name').value;
         if(!name) return;
         await fetch(`${API_BASE_URL}/folders`, {
@@ -165,6 +175,7 @@
     }
 
     async function selectFolder(folderId, folderName) {
+        // 切換右側會議清單到指定資料夾，並標示目前選取的資料夾。
         currentSelectedFolderId = folderId;
         
         document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
@@ -212,6 +223,7 @@
     }
 
     async function createMeeting() {
+        // 在目前選取的資料夾內建立會議，成功後直接進入錄製頁。
         const title = document.getElementById('new-meeting-title').value;
         if(!title || !currentSelectedFolderId) return;
         
@@ -224,11 +236,13 @@
     }
 
     function goToMeeting(meetingId, topic) {
+        // 將會議 id 與初始議題帶到 index.html，讓錄製頁知道要儲存到哪場會議。
         window.location.href = `index.html?meeting_id=${meetingId}&topic=${encodeURIComponent(topic)}`;
     }
 
     // 刪除邏輯維持不變
     async function deleteFolder(folderId, event) {
+        // 刪除資料夾會連帶刪除其中會議與音訊，因此先要求使用者確認。
         event.stopPropagation();
         if (!confirm("⚠️ 確定要刪除這個資料夾嗎？\\n裡面的「所有會議紀錄與音檔」將會一併被永久刪除！")) return;
 
@@ -251,6 +265,7 @@
     }
 
     async function deleteMeeting(meetingId, event) {
+        // 刪除單場會議後重新載入目前資料夾的會議清單。
         event.stopPropagation();
         if (!confirm("⚠️ 確定要刪除這筆會議紀錄嗎？此動作無法復原！")) return;
 

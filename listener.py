@@ -1,3 +1,13 @@
+"""WebSocket 即時會議處理器。
+
+前端 record.js 會連到本檔開的 ws://host:8765。此服務同時處理兩種資料：
+1. JSON 控制訊息，例如設定議程、要求摘要、圖片分析、建立下次會議。
+2. 二進位音訊片段，例如即時麥克風錄音與整個音訊檔上傳。
+
+辨識、摘要、圖片分析與行事曆建立都是阻塞型工作，因此會透過
+run_in_executor 丟到背景執行，避免卡住 WebSocket 收發。
+"""
+
 import asyncio
 import json
 import os
@@ -29,6 +39,11 @@ WS_PORT = 8765
 SILENCE_THRESHOLD = -35
 
 async def audio_handler(websocket):
+    """處理單一前端 WebSocket 連線的完整會議生命週期。
+
+    每個連線都維護自己的逐字稿、議程監控器、即時摘要與上傳暫存檔。
+    前端重新整理或中斷連線後，這些記憶體狀態會自然釋放。
+    """
     current_monitor = None
     server_clean_buffer = ""
     ai_transcript_log = ""
@@ -46,10 +61,12 @@ async def audio_handler(websocket):
     try:
         async for message in websocket:
             if isinstance(message, str):
+                # 字串訊息一律視為 JSON 控制事件；不同 type 代表不同前端動作。
                 try:
                     data = json.loads(message)
                     msg_type = data.get('type')
                     if msg_type == 'setup_agenda':
+                        # 會議開始前先鎖定議程與與會者，後續辨識可用於議程命中與 AI prompt。
                         user_topics = data.get('topics', [])
                         current_monitor = AgendaMonitor(user_topics)
                         
@@ -66,6 +83,7 @@ async def audio_handler(websocket):
                         await websocket.send(json.dumps({"type": "agenda_ready", "topics": user_topics}))
                     
                     elif msg_type == 'request_summary':
+                        # 會議結束或使用者手動要求時，整理目前累積的所有上下文產生總摘要。
                         template_type = data.get('template', 'general')
                         compiled_context = ""
                         
@@ -96,6 +114,7 @@ async def audio_handler(websocket):
                         else: await websocket.send(json.dumps({"type": "summary_result", "data": json_result}))
                     
                     elif msg_type == 'request_interim_summary':
+                        # 只摘要上次 interim 之後新增的逐字稿，避免重複摘要相同內容。
                         current_log_len = len(ai_transcript_log)
                         recent_transcript = ai_transcript_log[last_interim_index:current_log_len]
                         last_interim_index = current_log_len 
@@ -109,6 +128,7 @@ async def audio_handler(websocket):
                         await websocket.send(json.dumps({"type": "interim_summary_result", "data": interim_text}))
 
                     elif msg_type == 'analyze_image':
+                        # 圖片分析會先回傳進度，避免前端在模型處理時看起來沒有反應。
                         # 僅執行單次辨識並回傳，不儲存至全域 image_logs
                         base64_data = data.get('image_data', '')
                         filename = data.get('filename', 'image.jpg')
@@ -119,6 +139,7 @@ async def audio_handler(websocket):
                         await websocket.send(json.dumps({"type": "image_analysis_result", "filename": filename, "description": analysis_result}))
 
                     elif msg_type == 'schedule_next':
+                        # 使用 AI 建議的下次議程與使用者輸入的時間建立 Google Calendar 事件。
                         try:
                             loop = asyncio.get_running_loop()
                             event_link = await loop.run_in_executor(None, create_google_calendar_event, data.get('topic'), data.get('description'), data.get('datetime'), data.get('emails'))
@@ -127,6 +148,7 @@ async def audio_handler(websocket):
 
                     # 接收前端送來的圖片結果
                     elif msg_type == 'append_image_result':
+                        # 將已完成的圖片分析結果寫入逐字稿累積文字，使總摘要與 RAG 都能看到。
                         img_filename = data.get('filename', '圖片')
                         img_description = data.get('description', '')
                         
@@ -149,11 +171,13 @@ async def audio_handler(websocket):
                         }))
                             
                     elif msg_type == 'start_file_upload':
+                        # 大檔音訊以上傳模式處理：前端分塊傳送，後端先寫入暫存 webm。
                         is_file_mode = True
                         upload_file_handle = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
                         upload_file_path = upload_file_handle.name
                     
                     elif msg_type == 'end_file_upload':
+                        # 檔案上傳完成後一次交給 Whisper 轉錄，再產生總摘要。
                         if upload_file_handle: upload_file_handle.close()
                         await websocket.send(json.dumps({"type": "upload_progress", "message": "Whisper 轉錄中..."}))
                         try:
@@ -199,6 +223,7 @@ async def audio_handler(websocket):
                 except Exception as e: print(f"JSON Error: {e}")
                 continue 
             else:
+                # 二進位訊息是音訊資料。檔案模式直接寫入暫存檔；麥克風模式立即轉錄。
                 # 二進位音訊處理
                 if is_file_mode:
                     if upload_file_handle: upload_file_handle.write(message)
@@ -208,6 +233,7 @@ async def audio_handler(websocket):
                         temp_webm_path = temp_webm.name
                     try:
                         current_audio_chunk = AudioSegment.from_file(temp_webm_path)
+                        # 音量低於門檻視為靜音，跳過可減少 Whisper 無效推論。
                         if current_audio_chunk.dBFS < SILENCE_THRESHOLD: continue
                         
                         chunk_duration = current_audio_chunk.duration_seconds
@@ -217,6 +243,7 @@ async def audio_handler(websocket):
                         overlap_offset = 0.0
                         
                         if last_audio_segment is not None:
+                            # 附上前一段尾端當作上下文，提升切片邊界附近的辨識品質。
                             prefix_segment = last_audio_segment[-OVERLAP_DURATION_MS:]
                             samples_prefix = np.array(prefix_segment.get_array_of_samples()).astype(np.float32) / 32768.0
                             samples_to_process = np.concatenate((samples_prefix, samples_current))
@@ -258,6 +285,7 @@ async def audio_handler(websocket):
         print("連連線關閉")
 
 async def main():
+    """啟動 WebSocket server 並保持事件迴圈常駐。"""
     print(f"🚀 WebSocket 啟動於 ws://{WS_HOST}:{WS_PORT}")
     async with websockets.serve(audio_handler, WS_HOST, WS_PORT, max_size=None, ping_interval=None):
         await asyncio.Future()
